@@ -65,8 +65,41 @@ fn.data <- inner_join(fecaln.raw, colxndata, by = "SampleID")
   #remove extraneous columns
 fn.data <- subset(fn.data, select = -c(Sample.ID, ResidentMigratory,
                                        SampleType, SampleDate, Collector))
+  #format date properly
+fn.data$Date <- as.Date(as.character(fn.data$Date), format = "%m/%d/20%y")
   #create column relating collxn date to NDVI/EVI date
-fn.data$Sdate <- fn.data$Date()
+fn.data$SDate <- ifelse(as.Date(2014-06-10, origin = "1970-01-01") < fn.data$Date,
+                        fn.data$SDate <- "2014-06-10",
+                        fn.data$SDate <- "NA")
+
+#####BELOW ARE STARTED (NOT WORKING) ATTEMPTS AT DATE STUFF
+fn.data$SDate <- ifelse(between(fn.data$Date, as.Date(2014-06-10, origin = "1970-01-01"),
+                                as.Date(2014-06-26, origin = "1970-01-01")), 
+                        fn.data$SDate <- "2014-06-10",
+                        fn.data$SDate <- "NA")
+
+remove(fn.data)
+
+#fn.data <- mutate(Date <- ifelse(between()))
+
+#if (as.Date(2014-06-10, origin = "1970-01-01") < fn.data$Date 
+  #  && fn.data$Date < 2014-06-25)
+#  {
+#  fn.data$Sdate <- as.Date(2014-06-10, origin = "1970-01-01")
+#} else {
+#  fn.data$Sdate <- "NA"
+#}
+
+#fn.data$T1 <- 2014-06-10
+#fn.data$T2
+#fn.data$T3
+#fn.data$T4
+#fn.data$T5
+#fn.data$T6
+#fn.data$T7
+#fn.data$T8
+
+
 #####if it's between these 2 dates, call it this. If between these, this...
 #####these are the dates you want to call it
 unique(unlist(ndvi.data$Date))
