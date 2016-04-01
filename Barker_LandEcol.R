@@ -25,92 +25,92 @@ library(dplyr)
 library(tidyr)
   #spatial stuff
 
-###if you wanna check anything out
-summary(remote.raw)
-str(remote.raw)
-summary(fecaln.raw)
-str(fecaln.raw)
-
 ###prep remote data
-  #pull pellet-related remote data only; fix plot names
+  #pull pellet-related NDVI data only; fix plot names; tidy
 remote.data <- filter(remote.raw, Type == "Pellet 2014")
+remote.data <- select(remote.data, starts_with("ndvi."), PlotID)
 remote.data$PlotID <- extract_numeric(remote.data$PlotID)
-
-  #clean up and tidy
 remote.data <- rename(remote.data, SampleID = PlotID) 
-remote.data <- subset(remote.data, select = -c(system.index, Longitude,
-                                       Type, description, name))
-
-###prep EVI data
-evi.data <- gather(remote.data, key = Date, value = "EVI", -SampleID)
-evi.data <- na.omit(evi.data)
-evi.data$EVI.date <- substr(evi.data$EVI.date, 5, 12)
-  #make EVI.date column into an actual date
-evi.data$EVI.date <- as.Date(as.character(evi.data$EVI.date), format='%Y%m%d')
-
 
 ###prep NDVI data
-ndvi.data <- gather(remote.data, key = Date, value = "NDVI", -SampleID)
-ndvi.data <- na.omit(ndvi.data)
-ndvi.data$Date <- substr(ndvi.data$Date, 5, 12)
-#make EVI.date column into an actual date
-ndvi.data$Date <- as.Date(as.character(ndvi.data$Date), format='%Y%m%d')
-
+ndvi.data <- gather(remote.data, key = SDate, value = "NDVI", -SampleID)
+ndvi.data$SDate <- substr(ndvi.data$SDate, 6, 13)
+ndvi.data$SDate <- as.Date(as.character(ndvi.data$SDate), format='%Y%m%d')
 
 ###prep fecaln data
   #add lat-long to each sample
 colxndata <- read.csv("colxnsites2014.csv")
-fecaln.raw$SampleID <- fecaln.raw$Sample.ID
+fecaln.raw <- rename(fecaln.raw, SampleID = Sample.ID)
 fn.data <- inner_join(fecaln.raw, colxndata, by = "SampleID") 
-  #remove extraneous columns
-fn.data <- subset(fn.data, select = -c(Sample.ID, ResidentMigratory,
+  #remove extraneous columns; format date
+fn.data <- subset(fn.data, select = -c(ResidentMigratory,
                                        SampleType, SampleDate, Collector))
-  #format date properly
 fn.data$Date <- as.Date(as.character(fn.data$Date), format = "%m/%d/20%y")
-  #create column relating collxn date to NDVI/EVI date
-fn.data$SDate <- ifelse(as.Date(2014-06-10, origin = "1970-01-01") < fn.data$Date,
-                        fn.data$SDate <- "2014-06-10",
-                        fn.data$SDate <- "NA")
-
-#####BELOW ARE STARTED (NOT WORKING) ATTEMPTS AT DATE STUFF
-fn.data$SDate <- ifelse(between(fn.data$Date, as.Date(2014-06-10, origin = "1970-01-01"),
-                                as.Date(2014-06-26, origin = "1970-01-01")), 
-                        fn.data$SDate <- "2014-06-10",
-                        fn.data$SDate <- "NA")
-
-remove(fn.data)
-
-#fn.data <- mutate(Date <- ifelse(between()))
-
-#if (as.Date(2014-06-10, origin = "1970-01-01") < fn.data$Date 
-  #  && fn.data$Date < 2014-06-25)
-#  {
-#  fn.data$Sdate <- as.Date(2014-06-10, origin = "1970-01-01")
-#} else {
-#  fn.data$Sdate <- "NA"
-#}
-
-#fn.data$T1 <- 2014-06-10
-#fn.data$T2
-#fn.data$T3
-#fn.data$T4
-#fn.data$T5
-#fn.data$T6
-#fn.data$T7
-#fn.data$T8
-
-
-#####if it's between these 2 dates, call it this. If between these, this...
-#####these are the dates you want to call it
-unique(unlist(ndvi.data$Date))
+  #pathetically create column relating collxn date to NDVI/EVI date
+fn.data$SDate <- c("2014-06-10", "2014-06-10","2014-06-10","2014-06-10","2014-06-10","2014-06-10",
+                   "2014-06-26","2014-06-26","2014-06-26","2014-06-26","2014-06-26",
+                   "2014-07-12","2014-07-12","2014-07-12","2014-07-12",
+                   "2014-07-28","2014-07-28","2014-07-28","2014-07-28",
+                   "2014-08-13","2014-08-13","2014-08-13","2014-08-13","2014-08-13","2014-08-13","2014-08-13",
+                   "2014-08-29","2014-08-29","2014-08-29","2014-08-29","2014-08-29",
+                   "2014-09-14","2014-09-14","2014-09-14","2014-09-14",
+                   "2014-09-30","2014-09-30","2014-09-30")
+fn.data$SDate <- as.Date(as.character(fn.data$SDate), format='%Y-%m-%d')
 
 ###combine data
-   
+data <- inner_join(fn.data, ndvi.data, by=c("SampleID", "SDate"))   
+  #shit, now what?
 
 ###check out the data
-#hey data, you come here often?
-plot(fn.data$PctFN ~ fn.data$SamplePd, 
-     col=c("black", "red")[fn.data$MigStatus])
-plot(evi.data$Date, evi.data$EVI, xlab = "Date")
-plot(ndvi.data$Date, ndvi.data$NDVI, xlab = "Date")
-  #haven't figured this part out yet axis.Date(1, ndvi.data$Date, )
+#hey data, come here often?
+par(mfrow=c(2,1))
+hist(data$NDVI)
+hist(data$PctFN)
+
+scatter.smooth(data$PctFN ~ data$SDate, col=c("black", "red")[data$MigStatus])
+scatter.smooth(data$NDVI ~ data$SDate, col=c("black", "red")[data$MigStatus])
+
+dev.off()
+scatter.smooth(ndvi.data$NDVI ~ ndvi.data$SDate, xlim=c(16230,16350))
+scatter.smooth(data$PctFN ~ data$NDVI, col=c("black", "red")[data$MigStatus])
+
+###QUESTION: What factors best explain var'n in fecal N?
+###make a table of the outputs of various linear regressions
+reg1 <- lm(PctFN ~ NDVI, data=data)
+  summary(reg1)
+reg2 <- lm(PctFN ~ NDVI+SDate, data=data)
+  summary(reg2)
+reg3 <- lm(PctFN ~ NDVI+SDate+MigStatus, data=data)
+  summary(reg3)
+reg4 <- lm(PctFN ~ NDVI+SDate*MigStatus, data=data)
+  summary(reg4)
+reg5 <- lm(PctFN ~ SDate+MigStatus, data=data)
+  summary(reg5)
+reg6 <- lm(PctFN ~ SDate*MigStatus, data=data)
+  summary(reg6)
+reg7 <- lm(PctFN ~ SDate, data=data)
+  summary(reg7)
+  
+lm1 <- c(reg1$coefficients[1], reg1$coefficients[2], 
+         summary(reg1)$r.squared, summary(reg1)$sigma)
+lm2 <- c(reg2$coefficients[1], reg2$coefficients[2], 
+         summary(reg2)$r.squared, summary(reg2)$sigma)
+lm3 <- c(reg3$coefficients[1], reg3$coefficients[2], 
+         summary(reg3)$r.squared, summary(reg3)$sigma)
+lm4 <- c(reg4$coefficients[1], reg4$coefficients[2], 
+         summary(reg4)$r.squared, summary(reg4)$sigma)
+lm5 <- c(reg5$coefficients[1], reg5$coefficients[2], 
+         summary(reg5)$r.squared, summary(reg5)$sigma)
+lm6 <- c(reg6$coefficients[1], reg6$coefficients[2], 
+         summary(reg6)$r.squared, summary(reg6)$sigma)
+lm7 <- c(reg7$coefficients[1], reg7$coefficients[2], 
+         summary(reg7)$r.squared, summary(reg7)$sigma)
+
+tprep <- rbind(lm1, lm2, lm3, lm4, lm5, lm6, lm7)
+tab <- as.data.frame(tprep, row.names = 
+                       c("NDVI", "NDVI + Date", "NDVI + Date + MigStatus",
+                         "NDVI + Date * MigStatus", "Date + MigStatus", 
+                         "Date * MigStatus", "Date"))
+tab <- rename(tab, NDVIcoeff = NDVI)
+tab <- rename(tab, Rsquared = V3)
+tab <- rename(tab, StdError = V4)
