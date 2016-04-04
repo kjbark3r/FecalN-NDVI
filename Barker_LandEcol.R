@@ -28,6 +28,7 @@ library(tidyr)
   #analysis
 library(zoo) #integration - rollmean
 library(MESS) #integration - spline
+library(AICcmodavg) #AICc
 
 ##########DATA PREP##############
 ###prep remote data
@@ -69,10 +70,12 @@ data <- inner_join(fn.data, ndvi.data, by=c("SampleID", "SDate"))
 ##########PLOTS##############
 ###check out the data
 #hey data, come here often?
-par(mfrow=c(3,1))
+par(mfrow=c(4,1))
 hist(data$NDVI)
+hist(log(data$NDVI))
 hist(1/(data$PctFN))
 hist(log(data$PctFN))
+hist(data$NDVI^3)
 
 par(mfrow=c(1,1))
 plot(log(data$PctFN) ~ data$SDate, col=c("black", "red")[data$MigStatus], ylab="log(PctFN)")
@@ -129,6 +132,8 @@ View(tab)
 
 
 cor.test(data$NDVI, 1/(data$PctFN), alternative="two.sided",
+         method="pearson", conf.level = 0.95)
+cor.test(data$NDVI^3, 1/(data$PctFN), alternative="two.sided",
          method="pearson", conf.level = 0.95)
 
 ##########CSV'S##############
