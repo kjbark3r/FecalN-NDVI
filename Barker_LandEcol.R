@@ -26,8 +26,6 @@ library(tidyr)
   #plotting
 #library(ggplot2)
   #analysis
-library(zoo) #integration - rollmean
-library(MESS) #integration - spline
 library(AICcmodavg) #AICc
 
 ##########DATA PREP##############
@@ -45,7 +43,7 @@ ndvi.data$SDate <- as.Date(as.character(ndvi.data$SDate), format='%Y%m%d')
 
 ###prep fecaln data
   #add lat-long to each sample
-colxndata <- read.csv("colxnsites2014.csv")
+colxndata <- read.csv("colxnsites2014_elevs.csv")
 fecaln.raw <- rename(fecaln.raw, SampleID = Sample.ID)
 fn.data <- inner_join(fecaln.raw, colxndata, by = "SampleID") 
   #remove extraneous columns; format date
@@ -70,24 +68,55 @@ data <- inner_join(fn.data, ndvi.data, by=c("SampleID", "SDate"))
 ##########PLOTS##############
 ###check out the data
 #hey data, come here often?
-par(mfrow=c(4,1))
-hist(data$NDVI)
-hist(log(data$NDVI))
+
+#Normalizing FN
+par(mfrow=c(3,1))
+hist(data$PctFN)
 hist(1/(data$PctFN))
 hist(log(data$PctFN))
-hist(data$NDVI^3)
+
+#Normalizing NDVI
+par(mfrow=c(3,1))
+hist(data$NDVI) 
+hist(log(data$NDVI))
+hist(data$NDVI^2)
+##yeesh, let's look at all NDVI data
+par(mfrow=c(2,1))
+hist(ndvi.data$NDVI) 
+#hist(log(ndvi.data$NDVI)) #terrible
+hist(ndvi.data$NDVI^2)
+
+#Look at most normal of each
+par(mfrow=c(3,1))
+hist(1/(data$PctFN), main="FN")
+hist(data$NDVI^2, main = "NDVI")
+scatter.smooth(1/data$PctFN ~ data$NDVI^2)
+
+#Each by date - transformed
+par(mfrow=c(1,1))
+plot(1/data$PctFN ~ data$SDate, col=c("black", "red")[data$MigStatus], ylab="PctFN^-1")
+lines(loess.smooth(data$Date, 1/data$PctFN), col="brown")
+par(new=TRUE)
+plot(data$NDVI^2 ~ data$SDate, col=c("orange", "purple")[data$MigStatus], ylab="")
+lines(loess.smooth(data$Date, data$NDVI^2), col="green")
+axis(4)
+mtext(side=4, 'NDVI^2')
 
 par(mfrow=c(1,1))
-plot(log(data$PctFN) ~ data$SDate, col=c("black", "red")[data$MigStatus], ylab="log(PctFN)")
-lines(loess.smooth(data$Date, log(data$PctFN)), col="blue")
+scatter.smooth(1/data$PctFN ~ data$NDVI^2, col=c("black", "red")[data$MigStatus])
+scatter.smooth(1/data$PctFN ~ data$Elevm, col=c("black", "red")[data$MigStatus])
+scatter.smooth(1/data$PctFN ~ data$Date, col=c("black", "red")[data$MigStatus])
+
+###DATA BELOW THIS MAY NOT BE TRANSFORMED###
+#Each by date - raw
+par(mfrow=c(1,1))
+plot(data$PctFN ~ data$SDate, col=c("black", "red")[data$MigStatus], ylab="PctFN")
+lines(loess.smooth(data$Date, data$PctFN), col="brown")
 par(new=TRUE)
-plot(data$NDVI ~ data$SDate, col=c("orange", "purple")[data$MigStatus])
+plot(data$NDVI ~ data$SDate, col=c("orange", "purple")[data$MigStatus], ylab="")
 lines(loess.smooth(data$Date, data$NDVI), col="green")
 axis(4)
 mtext(side=4, 'NDVI')
-
-par(mfrow=c(1,1))
-scatter.smooth(log(data$PctFN) ~ data$NDVI, col=c("black", "red")[data$MigStatus])
 
 scatter.smooth(ndvi.data$NDVI ~ ndvi.data$SDate, xlim=c(16230,16350))
 par(new=TRUE)
@@ -96,32 +125,8 @@ lines(loess.smooth(data$Date, data$NDVI), col="green")
 
 ##########REGRESSIONS##############
 ###QUESTION: What factors best explain var'n in fecal N?
-###make a table of the outputs of various linear regressions
-reg1 <- lm(PctFN ~ NDVI, data=data) ; summary(reg1)
-reg2 <- lm(PctFN ~ NDVI+SDate, data=data) ; summary(reg2)
-reg3 <- lm(PctFN ~ NDVI+SDate+MigStatus, data=data) ; summary(reg3)
-reg4 <- lm(PctFN ~ NDVI+SDate*MigStatus, data=data) ; summary(reg4)
-reg5 <- lm(PctFN ~ SDate+MigStatus, data=data) ; summary(reg5)
-reg6 <- lm(PctFN ~ SDate*MigStatus, data=data) ; summary(reg6)
-reg7 <- lm(PctFN ~ SDate, data=data) ; summary(reg7)
-  
-lm1 <- c(reg1$coefficients[1], reg1$coefficients[2], summary(reg1)$r.squared, summary(reg1)$sigma)
-lm2 <- c(reg2$coefficients[1], reg2$coefficients[2], summary(reg2)$r.squared, summary(reg2)$sigma)
-lm3 <- c(reg3$coefficients[1], reg3$coefficients[2], summary(reg3)$r.squared, summary(reg3)$sigma)
-lm4 <- c(reg4$coefficients[1], reg4$coefficients[2], summary(reg4)$r.squared, summary(reg4)$sigma)
-lm5 <- c(reg5$coefficients[1], reg5$coefficients[2], summary(reg5)$r.squared, summary(reg5)$sigma)
-lm6 <- c(reg6$coefficients[1], reg6$coefficients[2], summary(reg6)$r.squared, summary(reg6)$sigma)
-lm7 <- c(reg7$coefficients[1], reg7$coefficients[2], summary(reg7)$r.squared, summary(reg7)$sigma)
 
-tprep <- rbind(lm1, lm2, lm3, lm4, lm5, lm6, lm7)
-tab <- as.data.frame(tprep, row.names = 
-                       c("NDVI", "NDVI + Date", "NDVI + Date + MigStatus",
-                         "NDVI + Date * MigStatus", "Date + MigStatus", 
-                         "Date * MigStatus", "Date"))
-tab <- rename(tab, NDVIcoeff = NDVI)
-tab <- rename(tab, Rsquared = V3)
-tab <- rename(tab, StdError = V4)
-View(tab)
+
 
 
 ##########PLAYING WITH DATA##############
@@ -129,12 +134,9 @@ View(tab)
 #2. Plot on map to just glance at habitat stuff
 #3. determine best measures of spread for fn and ndvi
   #then compare those
-
-
-cor.test(data$NDVI, 1/(data$PctFN), alternative="two.sided",
+cor.test(data$NDVI^2, 1/data$PctFN, alternative="two.sided",
          method="pearson", conf.level = 0.95)
-cor.test(data$NDVI^3, 1/(data$PctFN), alternative="two.sided",
-         method="pearson", conf.level = 0.95)
+
 
 ##########CSV'S##############
 write.csv(tab, file = "regressions.csv")
