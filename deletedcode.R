@@ -58,3 +58,20 @@ tab <- rename(tab, NDVIcoeff = NDVI)
 tab <- rename(tab, Rsquared = V3)
 tab <- rename(tab, StdError = V4)
 View(tab)
+
+library(AICcmodavg) #AICc
+
+#Each by date - raw
+par(mfrow=c(1,1))
+plot(data$PctFN ~ data$SDate, col=c("black", "red")[data$MigStatus], ylab="PctFN")
+lines(loess.smooth(data$Date, data$PctFN), col="brown")
+par(new=TRUE)
+plot(data$NDVI ~ data$SDate, col=c("orange", "purple")[data$MigStatus], ylab="")
+lines(loess.smooth(data$Date, data$NDVI), col="green")
+axis(4)
+mtext(side=4, 'NDVI')
+
+#below is the same as scatter.smooth
+plot(data$PctFN ~ data$NDVI, xlab="NDVI", 
+     ylab="Percent Fecal N", main = "Raw")
+lines(loess.smooth(data$NDVI, data$PctFN))

@@ -64,3 +64,56 @@ qa.qa$SDate <- as.Date(as.character(qa.qa$SDate), format='%Y%m%d')
 
 qa.data <- inner_join(qa.ndvi, qa.qa, by=c("SampleID", "SDate")) 
 qa.data <- inner_join(qa.data, data, by=c("SampleID", "SDate"))
+
+#just looking at misc graphs
+
+##res/mig FN and NDVI by date
+par(mfrow=c(2,2))
+plot(res$PctFN ~ res$SDate, col="brown", ylab="Fecal N (%)", 
+     ylim=c(2,4), xlab="Date", main="Resident")
+lines(loess.smooth(res$Date, res$PctFN), col="brown")
+plot(res$NDVI ~ res$SDate, col="green", ylab="NDVI", xlab="Date")
+lines(loess.smooth(res$Date, res$NDVI), col="green")
+
+plot(mig$PctFN ~ mig$SDate, col="brown", ylab="Fecal N (%)", 
+     ylim=c(2,4), xlab="Date", main="Migrant")
+lines(loess.smooth(mig$Date, mig$PctFN), col="brown")
+plot(mig$NDVI ~ mig$SDate, col="green", ylab="NDVI", xlab="Date")
+lines(loess.smooth(mig$Date, mig$NDVI), col="green")
+
+##res/mig FN-NDVI relationship - transformed data
+par(mfrow=c(2,1))
+scatter.smooth(1/res$PctFN ~ res$NDVI^2, col=c("black", "red")[res$MigStatus],
+               xlab="NDVI^2", ylab="Percent Fecal N^-1", main = "Resident")
+scatter.smooth(1/mig$PctFN ~ mig$NDVI^2, col=c("black", "red")[mig$MigStatus],
+               xlab="NDVI^2", ylab="Percent Fecal N^-1", main = "Migrant")
+
+##res/mig FN-NDVI relationship - raw data
+par(mfrow=c(2,1))
+scatter.smooth(res$PctFN ~ res$NDVI, xlab="NDVI", 
+               ylab="Percent Fecal N", main = "Resident")
+scatter.smooth(mig$PctFN ~ mig$NDVI, xlab="NDVI", 
+               ylab="Percent Fecal N", main = "Migrant")
+
+##FN-NDVI relationship - raw vs transformed data
+par(mfrow=c(2,1))
+scatter.smooth(data$PctFN ~ data$NDVI, xlab="NDVI", 
+               ylab="Percent Fecal N", main = "Raw")
+scatter.smooth(1/data$PctFN ~ data$NDVI^2, xlab="NDVI^2", 
+               ylab="1/Percent Fecal N", main = "Transformed")
+
+#making linear relationship between FN and date
+par(mfrow=c(1,1))
+scatter.smooth(data$PctFN ~ data$Date) #raw
+scatter.smooth(1/data$PctFN ~ data$Date) #exp fn
+scatter.smooth(log(data$PctFN) ~ data$Date) #log fn
+
+########AIC
+#aic stuff
+Cand.set <- list( )
+Cand.set[[1]] <- glm(1/PctFN ~ Date, data=data)
+Cand.set[[2]] <- glm(1/PctFN ~ Date+Elevm, data=data)
+Cand.set[[3]] <- glm(1/PctFN ~ Date*Elevm, data=data)
+names(Cand.set) <- c("date", "date+elev", "date*elev")
+
+aictab(Cand.set, modnames=NULL, second.ord=TRUE, nobs=NULL)
