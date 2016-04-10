@@ -111,19 +111,29 @@ mtext(side=4, 'NDVI^2')
 scatter.smooth(1/data$PctFN ~ data$NDVI^2, col=c("black", "red")[data$MigStatus],
                xlab = "NDVI^2", ylab = "Percent Fecal N^-1")
 #FN-Elev
-scatter.smooth(1/data$PctFN ~ data$Elevm, col=c("black", "red")[data$MigStatus],
+scatter.smooth(1/data$PctFN ~ data$Elevm,
                xlab="Elevation (m)", ylab="Percent Fecal N^-1")
 #FN-Elev by MigStatus
 par(mfrow=c(2,1))
-scatter.smooth(1/res$PctFN ~ res$Elevm, col=c("black", "red")[res$MigStatus],
+scatter.smooth(1/res$PctFN ~ res$Elevm,
                xlab="Elevation (m)", ylab="Percent Fecal N^-1", main = "Resident")
-scatter.smooth(1/mig$PctFN ~ mig$Elevm, col=c("black", "red")[mig$MigStatus],
+scatter.smooth(1/mig$PctFN ~ mig$Elevm,
                xlab="Elevation (m)", ylab="Percent Fecal N^-1", main = "Migrant")
 
 #FN-Date
 par(mfrow=c(1,1))
-scatter.smooth(1/data$PctFN ~ data$Date, col=c("black", "red")[data$MigStatus],
-               xlab="Date", ylab="Percent Fecal N^-1")
+scatter.smooth(1/data$PctFN ~ data$Date,
+               xlab="Date", ylab="1/Percent Fecal N")
+
+#FN-DOY
+par(mfrow=c(1,1))
+scatter.smooth(data$PctFN ~ data$DOY,
+               xlab="Day of Year", ylab="Percent Fecal N")
+
+#FN-Date+Elev
+scatter.smooth(1/data$PctFN ~ data$Elevm+data$DOY,
+               xlab="Date*Elev", ylab="Percent Fecal N^-1")
+
 #FN-Date by MigStatus
 ####NEED TO FORMAT DATES BETTER
 par(mfrow=c(2,1))
@@ -156,36 +166,63 @@ par(new=TRUE)
 plot(data$NDVI ~ data$SDate, col="green", xlim=c(16230,16350))
 lines(loess.smooth(data$Date, data$NDVI), col="green")
 
-##########REGRESSIONS##############
-###QUESTION: What factors best explain var'n in fecal N?
-date <- glm(1/PctFN ~ Date, data=data) ; summary(date)
-date.elev <- glm(1/PctFN ~ Date+Elevm, data=data) ; summary(date.elev)
-date.elev.intrxn <- glm(1/PctFN ~ Date*Elevm, data=data) ; summary(date.elev.intrxn)
-lm1 <- c(date$coefficients[1], date$coefficients[2], summary(date)$adj.r.squared, summary(date)$sigma)
-lm2 <- c(elev$coefficients[1], elev$coefficients[2], summary(elev)$adj.r.squared, summary(elev)$sigma)
-lm3 <- c(date.elev$coefficients[1], date.elev$coefficients[2], summary(date.elev)$adj.r.squared, summary(date.elev)$sigma)
-lm4 <- c(date.elev.intrxn$coefficients[1], date.elev.intrxn$coefficients[2], summary(date.elev.intrxn)$adj.r.squared, summary(date.elev.intrxn)$sigma)
-tprep <- rbind(lm1, lm2, lm3, lm4)
-tab <- as.data.frame(tprep, row.names = 
-                       c("Date", "Elev", "Date + Elev", "Date * Elev"))
-#tab <- rename(tab, NDVIcoeff = NDVI)
-tab <- rename(tab, AdjRsquared = V3)
-tab <- rename(tab, StdError = V4)
-View(tab)
 
+##########CORRELATIONS##############
+#FN-NDVI - raw
+cor.test(data$NDVI, data$PctFN, alternative="two.sided",
+         method="pearson", conf.level = 0.95)
 
-
-##########PLAYING WITH DATA##############
-#1. Split out by resident/migrant?? (Meh)
-#2. Plot on map to just glance at habitat stuff
-#3. determine best measures of spread for fn and ndvi
-  #then compare those
+#FN-NDVI - transformed [this probably makes no sense]
 cor.test(data$NDVI^2, 1/data$PctFN, alternative="two.sided",
          method="pearson", conf.level = 0.95)
 
+#FN-Date
+cor.test(data$DOY, data$PctFN, alternative="two.sided",
+         method="pearson", conf.level = 0.95)
 
-##########CSV'S##############
+#FN-Elev
+cor.test(data$Elevm, data$PctFN, alternative="two.sided",
+         method="pearson", conf.level = 0.95)
+
+##########REGRESSIONS##############
+##Models## Plus residual plots, commented out
+d <- lm(PctFN ~ Date, data=data); summary(d)
+de <- lm(PctFN ~ Date+Elevm, data=data); summary(de)
+dn <- lm(PctFN ~ Date+NDVI, data=data); summary(dn)
+den <- lm(PctFN ~ Date+Elevm+NDVI, data=data); summary(den)
+  #par(mfrow=c(2,2))
+  #plot(d)
+  #plot(de)
+  #plot(dn)
+  #plot(den)
+
+lm1 <- c(de$coefficients[1], summary(de)$adj.r.squared, summary(de)$sigma)
+lm2 <- c(den$coefficients[1], summary(den)$adj.r.squared, summary(den)$sigma)
+lm3 <- c(d$coefficients[1], summary(d)$adj.r.squared, summary(d)$sigma)
+lm4 <- c(dn$coefficients[1], summary(dn)$adj.r.squared, summary(dn)$sigma)
+
+tprep <- rbind(lm1, lm2, lm3, lm4)
+tab <- as.data.frame(tprep, row.names = 
+                       c("Date + Elevation", "Date + Elevation + NDVI", "Date", "Date + NDVI"))
+#tab <- rename(tab, NDVIcoeff = NDVI)
+tab <- rename(tab, AdjRsquared = V2)
+tab <- rename(tab, StdError = V3)
+View(tab)
 write.csv(tab, file = "regressions.csv")
+
+##AIC##
+Cand.set <- list( )
+Cand.set[[1]] <- glm(PctFN ~ Date, data=data)
+Cand.set[[2]] <- glm(PctFN ~ Date+Elevm, data=data)
+Cand.set[[3]] <- glm(PctFN ~ Date+NDVI, data=data)
+Cand.set[[4]] <- glm(PctFN ~ Date+Elevm+NDVI, data=data)
+names(Cand.set) <- c("Date", "Date + Elevation", "Date + NDVI", "Date + Elevation + NDVI")
+
+aictable <- aictab(Cand.set, second.ord=TRUE)
+aicresults <- print(aictable, digits = 2, LL = FALSE)
+
+
+##########Misc CSV'S##############
 write.csv(data, file = "fn-ndvi.csv")
 
 ndvi.coord.data <- inner_join(ndvi.data, colxndata, by = "SampleID")
