@@ -61,6 +61,9 @@ fn.data$SDate <- as.Date(as.character(fn.data$SDate), format='%Y-%m-%d')
 
 ###combine data
 data <- inner_join(fn.data, ndvi.data, by=c("SampleID", "SDate"))   
+#add day of year
+data$DOY <- strftime(data$Date, format = "%j")
+data$DOY <- as.numeric(data$DOY)
   #shit, now what?
 
 ##########PLOTS##############

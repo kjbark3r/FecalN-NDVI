@@ -1,9 +1,5 @@
 ##########MUCKERY##############
 
-#add day of year
-data$DOY <- strftime(data$Date, format = "%j")
-data$DOY <- as.numeric(data$DOY)
-
 ##########
 #1. remove late july and early august dates; rerun plot and correlation
 rmvd.data <- filter(data, SDate == "2014-06-10" | SDate == "2014-06-26" | 
