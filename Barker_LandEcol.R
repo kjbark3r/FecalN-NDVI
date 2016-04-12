@@ -18,6 +18,7 @@ wd_laptop <- "C:\\Users\\kjbark3r\\Documents\\GitHub\\FecalN-NDVI"
 setwd(inpath)
 remote.raw <- read.csv("remotedata.csv")
 fecaln.raw <- read.csv("fecalndata2014.csv")
+colxndata <- read.csv("colxnsites2014_elevs_habs.csv")
 
 ###load libraries
   #data wrangling
@@ -41,7 +42,6 @@ ndvi.data$SDate <- as.Date(as.character(ndvi.data$SDate), format='%Y%m%d')
 
 ###prep fecaln data
   #add lat-long to each sample
-colxndata <- read.csv("colxnsites2014_elevs.csv")
 fecaln.raw <- rename(fecaln.raw, SampleID = Sample.ID)
 fn.data <- inner_join(fecaln.raw, colxndata, by = "SampleID") 
   #remove extraneous columns; format date
@@ -58,6 +58,28 @@ fn.data$SDate <- c("2014-06-10", "2014-06-10","2014-06-10","2014-06-10","2014-06
                    "2014-09-14","2014-09-14","2014-09-14","2014-09-14",
                    "2014-09-30","2014-09-30","2014-09-30")
 fn.data$SDate <- as.Date(as.character(fn.data$SDate), format='%Y-%m-%d')
+  #set hab types
+fn.data <- rename(fn.data, HabClass = RASTERVALU) 
+fn.data <- mutate(fn.data, Landcov = ifelse(HabClass == 0, "Mask", 
+                                     ifelse(HabClass == 1, "Badlands",
+                                     ifelse(HabClass == 2, "Riparian",
+                                     ifelse(HabClass == 3, "Forest",
+                                     ifelse(HabClass == 4, "Shrub",
+                                     ifelse(HabClass == 5, "Sagebrush",
+                                     ifelse(HabClass == 6, "Grassland",
+                                     ifelse(HabClass == 7, "Agricultural",
+                                            NA)))))))))
+fn.data <- mutate(fn.data, Treecov = ifelse(HabClass == 0, "N", 
+                                     ifelse(HabClass == 1, "N",
+                                     ifelse(HabClass == 2, "Y",
+                                     ifelse(HabClass == 3, "Y",
+                                     ifelse(HabClass == 4, "N",
+                                     ifelse(HabClass == 5, "N",
+                                     ifelse(HabClass == 6, "N",
+                                     ifelse(HabClass == 7, "N",
+                                            NA)))))))))
+fn.data$Landcov <- as.factor(fn.data$Landcov)
+fn.data$Treecov <- as.factor(fn.data$Treecov)
 
 ###combine data
 data <- inner_join(fn.data, ndvi.data, by=c("SampleID", "SDate"))   
@@ -219,8 +241,10 @@ Cand.set[[1]] <- glm(PctFN ~ Date, data=data)
 Cand.set[[2]] <- glm(PctFN ~ Date+Elevm, data=data)
 Cand.set[[3]] <- glm(PctFN ~ Date+NDVI, data=data)
 Cand.set[[4]] <- glm(PctFN ~ Date+Elevm+NDVI, data=data)
-names(Cand.set) <- c("Date", "Date + Elevation", "Date + NDVI", "Date + Elevation + NDVI")
-
+names(Cand.set) <- c("Date", 
+                     "Date + Elevation", 
+                     "Date + NDVI", 
+                     "Date + Elevation + NDVI")
 aictable <- aictab(Cand.set, second.ord=TRUE)
 aicresults <- print(aictable, digits = 2, LL = FALSE)
 

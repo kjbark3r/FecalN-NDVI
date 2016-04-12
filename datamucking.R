@@ -65,7 +65,8 @@ qa.qa$SDate <- as.Date(as.character(qa.qa$SDate), format='%Y%m%d')
 qa.data <- inner_join(qa.ndvi, qa.qa, by=c("SampleID", "SDate")) 
 qa.data <- inner_join(qa.data, data, by=c("SampleID", "SDate"))
 
-#just looking at misc graphs
+#####################
+#MISC GRAPHS
 
 ##res/mig FN and NDVI by date
 par(mfrow=c(2,2))
@@ -107,6 +108,21 @@ par(mfrow=c(1,1))
 scatter.smooth(data$PctFN ~ data$Date) #raw
 scatter.smooth(1/data$PctFN ~ data$Date) #exp fn
 scatter.smooth(log(data$PctFN) ~ data$Date) #log fn
+
+
+#lANDCOVER STUFF
+par(mfrow=c(2,1))
+plot(data$NDVI ~ data$Landcov)
+plot(data$NDVI ~ data$Treecov)
+
+plot(data$NDVI ~ data$Landcov)
+plot(data$PctFN ~ data$Landcov)
+
+plot(data$NDVI ~ data$Treecov)
+plot(data$PctFN ~ data$Treecov)
+
+plot(data$Elev ~ data$Landcov)
+plot(data$Date ~ data$Landcov)
 
 ########AIC
 #aic stuff
