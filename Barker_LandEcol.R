@@ -69,23 +69,25 @@ fn.data <- mutate(fn.data, Landcov = ifelse(HabClass == 0, "Mask",
                                      ifelse(HabClass == 6, "Grassland",
                                      ifelse(HabClass == 7, "Agricultural",
                                             NA)))))))))
-fn.data <- mutate(fn.data, Treecov = ifelse(HabClass == 0, "N", 
-                                     ifelse(HabClass == 1, "N",
-                                     ifelse(HabClass == 2, "Y",
-                                     ifelse(HabClass == 3, "Y",
-                                     ifelse(HabClass == 4, "N",
-                                     ifelse(HabClass == 5, "N",
-                                     ifelse(HabClass == 6, "N",
-                                     ifelse(HabClass == 7, "N",
+fn.data <- mutate(fn.data, Treecov = ifelse(HabClass == 0, "0", 
+                                     ifelse(HabClass == 1, "0",
+                                     ifelse(HabClass == 2, "1",
+                                     ifelse(HabClass == 3, "1",
+                                     ifelse(HabClass == 4, "0",
+                                     ifelse(HabClass == 5, "0",
+                                     ifelse(HabClass == 6, "0",
+                                     ifelse(HabClass == 7, "0",
                                             NA)))))))))
 fn.data$Landcov <- as.factor(fn.data$Landcov)
-fn.data$Treecov <- as.factor(fn.data$Treecov)
+fn.data$Treecov <- as.numeric(fn.data$Treecov)
 
 ###combine data
 data <- inner_join(fn.data, ndvi.data, by=c("SampleID", "SDate"))   
 #add day of year
 data$DOY <- strftime(data$Date, format = "%j")
 data$DOY <- as.numeric(data$DOY)
+res <- filter(data, MigStatus=="Res")
+mig <- filter(data, MigStatus=="Mig")
   #shit, now what?
 
 ##########PLOTS##############
@@ -185,6 +187,25 @@ plot(mig$PctFN ~ mig$SDate, col="brown", ylab="Fecal N (%)",
 lines(loess.smooth(mig$Date, mig$PctFN), col="brown")
 plot(data$NDVI ~ data$SDate, col="green", ylab="NDVI", xlab="Date")
   lines(loess.smooth(data$Date, data$NDVI), col="green")
+
+#FN raw - res/mig split
+par(mfrow=c(2,1))
+plot(res$PctFN ~ res$NDVI, ylab="Fecal N (%)", 
+     ylim=c(2,4), xlim=c(3500,7500), xlab="NDVI", main="Resident")
+lines(loess.smooth(res$NDVI, res$PctFN))
+plot(mig$PctFN ~ mig$NDVI, ylab="Fecal N (%)", 
+     ylim=c(2,4), xlim=c(3500,7500), xlab="NDVI", main="Migrant")
+lines(loess.smooth(mig$NDVI, mig$PctFN))  
+
+#FN raw - res/mig split MINUS MIG OUTLIER
+mig.nooutlier <- mig[-3,]
+par(mfrow=c(2,1))
+plot(res$PctFN ~ res$NDVI, ylab="Fecal N (%)", 
+     ylim=c(2,4), xlim=c(3500,7500), xlab="NDVI", main="Resident")
+lines(loess.smooth(res$NDVI, res$PctFN))
+plot(mig.nooutlier$PctFN ~ mig.nooutlier$NDVI, ylab="Fecal N (%)", 
+     ylim=c(2,4), xlim=c(3500,7500), xlab="NDVI", main="Migrant")
+lines(loess.smooth(mig.nooutlier$NDVI, mig.nooutlier$PctFN))  
 
 scatter.smooth(ndvi.data$NDVI ~ ndvi.data$SDate, xlim=c(16230,16350))
 par(new=TRUE)
