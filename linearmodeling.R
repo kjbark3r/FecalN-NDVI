@@ -144,6 +144,15 @@ datetable <- aictab(date.set, second.ord=TRUE)
 dateresults <- print(datetable, digits = 2, LL = FALSE)
 #Date or Date+Treecover
 
+#Date+Elev or Date*Elev 
+dateelev.set <- list( )
+dateelev.set[[1]] <- lm(PctFN ~ Date+Elevm, data=data)
+dateelev.set[[2]] <- lm(PctFN ~ Date*Elevm, data=data)
+names(dateelev.set) <- c("Date + Elev",
+                     "Date * Elev")
+dateelevtable <- aictab(dateelev.set, second.ord=TRUE)
+dateelevresults <- print(dateelevtable, digits = 2, LL = FALSE)
+
 #landcover or tree cover for FN
 cov.set <- list( )
 cov.set[[1]] <- lm(PctFN ~ Landcov, data=data)
