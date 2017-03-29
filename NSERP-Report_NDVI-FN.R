@@ -90,11 +90,11 @@ latlong <- CRS("+init=epsg:4326")
 stateplane <- CRS("+init=epsg:2818")
 
 # read in and set projections
-elev <- raster("../Vegetation/writtenrasters/cropped/elev.tif")
+elev <- raster("../Vegetation/writtenrasters/covs2014/elev.tif")
 elev <- projectRaster(elev, crs = latlong)
-lc14 <- raster("../Vegetation/writtenrasters/cropped/landcov_14.tif")
+lc14 <- raster("../Vegetation/writtenrasters/covs2014/landcov_14.tif")
 lc14 <- projectRaster(lc14, crs = latlong)
-lc15 <- raster("../Vegetation/writtenrasters/cropped/landcov_15.tif")
+lc15 <- raster("../Vegetation/writtenrasters/covs2015/landcov_15.tif")
 lc15 <- projectRaster(lc15, crs = latlong)
 s <- stack(elev, lc14, lc15)
 
