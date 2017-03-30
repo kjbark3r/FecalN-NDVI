@@ -18,7 +18,7 @@ rm(wd_workcomp, wd_laptop)
 
 ## LOAD LIBRARIES ##
 library(AICcmodavg) # model selection
-library(raster) # for ndvi amp & ti-ndvi
+library(raster) # ndvi amp & ti-ndvi
 library(ggplot2) # pretty plots
 library(gridExtra) # display several plots
 library(tidyr) # data wrangling
@@ -96,16 +96,37 @@ veg$Treecov <- as.factor(veg$Treecov)
 
 ## visualizing univariate relationships ##
 
-# loess-smoothed ndvi relationship plots
-pbm <- ggplot(veg, aes(x = NDVI, y = ForageBiomass)) +
-  geom_smooth(color = "black")
-pfq <- ggplot(veg,aes(x = NDVI, y = DE)) +
-  geom_smooth(color = "black")
-pfn <- ggplot(fn, aes(x = NDVI, y = PctFN)) +
-  geom_smooth(color = "black")
-grid.arrange(pbm, pfq, pfn)
+
+## forage biomass - loess smoother ##
+p.bm.n <- ggplot(veg, aes(x = NDVI, y = ForageBiomass)) +
+  geom_smooth(method = "loess", color = "black")
+p.bm.e <- ggplot(veg, aes(x = EVI, y = ForageBiomass)) +
+  geom_smooth(method = "loess", color = "black")
+p.bm.na <- ggplot(veg, aes(x = ndvi_amp, y = ForageBiomass)) +
+  geom_smooth(method = "loess", color = "black")
+p.bm.nt <- ggplot(veg, aes(x = ndvi_ti, y = ForageBiomass)) +
+  geom_smooth(method = "loess", color = "black")
+grid.arrange(p.bm.n, p.bm.e, p.bm.na, p.bm.nt)
 
 
+## digestible energy ##
+p.de.n <- ggplot(veg, aes(x = NDVI, y = DE)) +
+  geom_smooth(method = "loess", color = "black")
+p.de.e <- ggplot(veg, aes(x = EVI, y = DE)) +
+  geom_smooth(method = "loess", color = "black")
+p.de.na <- ggplot(veg, aes(x = ndvi_amp, y = DE)) +
+  geom_smooth(method = "loess", color = "black")
+p.de.nt <- ggplot(veg, aes(x = ndvi_ti, y = DE)) +
+  geom_smooth(method = "loess", color = "black")
+grid.arrange(p.de.n, p.de.e, p.de.na, p.de.nt)
+
+
+## fecal nitrogen ##
+p.fn.n <- ggplot(fn, aes(x = NDVI, y = PctFN)) +
+  geom_smooth(method = "loess", color = "black")
+p.fn.e <- ggplot(fn, aes(x = EVI, y = PctFN)) +
+  geom_smooth(method = "loess", color = "black")
+grid.arrange(p.fn.n, p.fn.e)
 
 
 
@@ -113,10 +134,12 @@ grid.arrange(pbm, pfq, pfn)
 
 ## forage biomass ##
 Cand.set <- list( )
-Cand.set[[1]] <- lm(ForageBiomass ~ NDVI, data = veg)
-Cand.set[[2]] <- lm(ForageBiomass ~ EVI, data = veg)
-Cand.set[[3]] <- lm(ForageBiomass ~ ndvi_amp, data = veg)
-Cand.set[[4]] <- lm(ForageBiomass ~ ndvi_ti, data = veg)
+Cand.set[[1]] <- glm(ForageBiomass ~ NDVI, data = veg)
+Cand.set[[2]] <- glm(ForageBiomass ~ EVI, data = veg)
+Cand.set[[3]] <- glm(ForageBiomass ~ ndvi_amp, 
+                     data = veg)
+Cand.set[[4]] <- glm(ForageBiomass ~ ndvi_ti, 
+                     data = veg)
 names(Cand.set) <- c("Biomass-NDVI", "Biomass-EVI",
                      "Biomass-NDVIamp", "Biomass-NDVIti")
 aictable1 <- aictab(Cand.set, second.ord=TRUE)
@@ -124,10 +147,10 @@ aicresults <- print(aictable1, digits = 2, LL = FALSE)
 
 ## digestible energy ##
 Cand.set <- list( )
-Cand.set[[1]] <- lm(DE ~ NDVI, data = veg)
-Cand.set[[2]] <- lm(DE ~ EVI, data = veg)
-Cand.set[[3]] <- lm(DE ~ ndvi_amp, data = veg)
-Cand.set[[4]] <- lm(DE ~ ndvi_ti, data = veg)
+Cand.set[[1]] <- glm(DE ~ NDVI, data = veg)
+Cand.set[[2]] <- glm(DE ~ EVI, data = veg)
+Cand.set[[3]] <- glm(DE ~ ndvi_amp, data = veg)
+Cand.set[[4]] <- glm(DE ~ ndvi_ti, data = veg)
 names(Cand.set) <- c("DE-NDVI", "DE-EVI", "DE-NDVIamp",
                      "DE-NDVIti")
 aictable2 <- aictab(Cand.set, second.ord=TRUE)
@@ -136,8 +159,8 @@ aicresults <- print(aictable2, digits = 2, LL = FALSE)
 
 ## fecal nitrogen ##
 Cand.set <- list( )
-Cand.set[[1]] <- lm(PctFN ~ NDVI, data = fn)
-Cand.set[[2]] <- lm(PctFN ~ EVI, data = fn)
+Cand.set[[1]] <- glm(PctFN ~ NDVI, data = fn)
+Cand.set[[2]] <- glm(PctFN ~ EVI, data = fn)
 names(Cand.set) <- c("FN-NDVI", "FN-EVI")
 aictable3 <- aictab(Cand.set, second.ord=TRUE)
 aicresults <- print(aictable3, digits = 2, LL = FALSE)
@@ -215,3 +238,36 @@ plot(mfq)
 mfn <- lm(PctFN ~ NDVI, data = fn)
 summary(mfn)
 plot(mfn)
+
+
+
+### glm-smoothed plots ###
+
+## forage biomass - glm smoother ##
+p.bm.n <- ggplot(veg, aes(x = NDVI, y = ForageBiomass)) +
+  geom_smooth(method = "glm", color = "black")
+p.bm.e <- ggplot(veg, aes(x = EVI, y = ForageBiomass)) +
+  geom_smooth(method = "glm", color = "black")
+p.bm.na <- ggplot(veg, aes(x = ndvi_amp, y = ForageBiomass)) +
+  geom_smooth(method = "glm", color = "black")
+p.bm.nt <- ggplot(veg, aes(x = ndvi_ti, y = ForageBiomass)) +
+  geom_smooth(method = "glm", color = "black")
+grid.arrange(p.bm.n, p.bm.e, p.bm.na, p.bm.nt)
+
+## digestible energy ##
+p.de.n <- ggplot(veg, aes(x = NDVI, y = DE)) +
+  geom_smooth(method = "glm", color = "black")
+p.de.e <- ggplot(veg, aes(x = EVI, y = DE)) +
+  geom_smooth(method = "glm", color = "black")
+p.de.na <- ggplot(veg, aes(x = ndvi_amp, y = DE)) +
+  geom_smooth(method = "glm", color = "black")
+p.de.nt <- ggplot(veg, aes(x = ndvi_ti, y = DE)) +
+  geom_smooth(method = "glm", color = "black")
+grid.arrange(p.de.n, p.de.e, p.de.na, p.de.nt)
+
+## fecal nitrogen ##
+p.fn.n <- ggplot(fn, aes(x = NDVI, y = PctFN)) +
+  geom_smooth(method = "glm", color = "black")
+p.fn.e <- ggplot(fn, aes(x = EVI, y = PctFN)) +
+  geom_smooth(method = "glm", color = "black")
+grid.arrange(p.fn.n, p.fn.e)
