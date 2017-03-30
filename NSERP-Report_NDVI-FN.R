@@ -23,13 +23,13 @@ library(tidyr) # data wrangling
 library(dplyr) # data wrangling
 
 
+
+########## DATA PREP (run once) ##############
+
 ## READ IN RAW DATA ##
 remote.raw <- read.csv("remotedata.csv")
 fecaln.raw <- read.csv("fecalndata20142015.csv")
 colxndata <- read.csv("pelletcolxnsites.csv")
-
-
-########## DATA PREP ##############
 
 ## REMOTE DATA - FROM GOOGLE EARTH ENGINE/BRADY ALLRED ##
 # pull pellet-related NDVI data only; fix plot names; tidy
@@ -38,11 +38,24 @@ remote.data <- dplyr::filter(remote.raw, Type == "Pellet 2014" |
 remote.data <- select(remote.data, starts_with("ndvi."), PlotID)
 remote.data$PlotID <- readr::parse_number(remote.data$PlotID)
 remote.data <- rename(remote.data, SampleID = PlotID) 
-
-## NDVI DATES ##
 ndvi.data <- gather(remote.data, key = SDate, value = "NDVI", -SampleID)
 ndvi.data$SDate <- substr(ndvi.data$SDate, 6, 13)
 ndvi.data$SDate <- as.Date(as.character(ndvi.data$SDate), format='%Y%m%d')
+
+
+# pull pellet-related EVI data only; fix plot names; tidy
+remote.data2 <- dplyr::filter(remote.raw, Type == "Pellet 2014" |
+                        Type == "Pellet 2015")
+remote.data2 <- select(remote.data2, starts_with("evi."), PlotID)
+remote.data2$PlotID <- readr::parse_number(remote.data2$PlotID)
+remote.data2 <- rename(remote.data2, SampleID = PlotID) 
+evi.data <- gather(remote.data2, key = SDate, value = "EVI", -SampleID)
+evi.data$SDate <- substr(evi.data$SDate, 5, 12)
+evi.data$SDate <- as.Date(as.character(evi.data$SDate), format='%Y%m%d')
+
+## and combine ndvi and evi
+# (calling it ndvi data so i don't have to record a bunch of stuff)
+ndvi.data <- full_join(ndvi.data, evi.data, by = c("SampleID", "SDate"))
 
 ## FECAL NITROGEN DATA ##
 # add lat-long to each sample
@@ -83,69 +96,89 @@ colxndata <- rename(colxndata, SampleID = Sample.ID)
 data.tmp <- left_join(data.tmp, colxndata, by = "SampleID")
 
 
-#### ADD ELEV AND LANDCOVER ####
+### ADD ELEV AND LANDCOVER ###
 
 # set projections
 latlong <- CRS("+init=epsg:4326")
 stateplane <- CRS("+init=epsg:2818")
 
-# read in and set projections
+# read in rasters
 elev <- raster("../Vegetation/writtenrasters/covs2014/elev.tif")
-elev <- projectRaster(elev, crs = latlong)
 lc14 <- raster("../Vegetation/writtenrasters/covs2014/landcov_14.tif")
-lc14 <- projectRaster(lc14, crs = latlong)
-lc15 <- raster("../Vegetation/writtenrasters/covs2015/landcov_15.tif")
-lc15 <- projectRaster(lc15, crs = latlong)
-s <- stack(elev, lc14, lc15)
+s <- stack(elev, lc14)
 
 # create spatial dataframe of fecal n locations
+# in same projection as rasters 
+# (can't reproject rasters bc it changes their values)
 data.xy <- data.frame("x" = data.tmp$Longitude, "y" = data.tmp$Latitude)
-data.sp <- SpatialPointsDataFrame(data.xy, data.tmp, proj4string = latlong)
+data.ll <- SpatialPointsDataFrame(data.xy, data.tmp, proj4string = latlong)
+data.sp <- spTransform(data.ll, stateplane)
 ext <- raster::extract(s, data.sp)
-data <- cbind(ext, data.tmp)
+dat <- cbind(ext, data.tmp)
+
+# add landcover class names and treecover (open/closed canopy)
+clsref <- data.frame(Landcov = c(1,2,3,4,5,6,7,8,9,10,11,12),
+                     ClassName = c("Mesic Forest (Burn >15)", #1
+                                    "Dry Forest (Burn >15)", #2 
+                                    "Grass/Shrub/Open Woodland", #3
+                                    "Dry Ag", #4
+                                    "Valley Bottom Riparian", #5
+                                    "Montane Riparian", #6
+                                    "Irrigated Ag", #7
+                                    "Dry Forest Burn 0-5", #8
+                                    "Dry Forest Burn 6-15", #9
+                                    "Mesic Forest Burn 0-5",#10
+                                    "Mesic Forest Burn 6-15", #11
+                                    "Rx Dry Forest Burn 0-5")) #12
+data <- dat %>%
+  rename(Landcov = landcov_14,
+         Elevm = elev) %>%
+  left_join(clsref, by = "Landcov") %>%
+  mutate(Treecov = ifelse(Landcov == 1, "1", 
+                   ifelse(Landcov == 2, "1",
+                   ifelse(Landcov == 3, "0",
+                   ifelse(Landcov == 4, "0",
+                   ifelse(Landcov == 5, "1",
+                   ifelse(Landcov == 6, "1",
+                   ifelse(Landcov == 7, "0",
+                   ifelse(Landcov == 8, "0",
+                   ifelse(Landcov == 9, "0",
+                   ifelse(Landcov == 10, "0",
+                   ifelse(Landcov == 11, "0",
+                   ifelse(Landcov == 12, "0",
+                          NA))))))))))))) %>%
+    dplyr::select(SampleID, MigStatus, Date, PctFN, 
+                  NDVI, EVI, Elevm, Treecov, Landcov, ClassName, 
+                  DOY, SDate, Latitude, Longitude)
+write.csv(data, file = "ndvi-fn-data.csv", row.names=F)
 
 
 
-#~#~THIS WENT after fn.data$Date line
-fn.data <- mutate(fn.data, Treecov = ifelse(HabClass == 0, "0", 
-                                     ifelse(HabClass == 1, "0",
-                                     ifelse(HabClass == 2, "1",
-                                     ifelse(HabClass == 3, "1",
-                                     ifelse(HabClass == 4, "0",
-                                     ifelse(HabClass == 5, "0",
-                                     ifelse(HabClass == 6, "0",
-                                     ifelse(HabClass == 7, "0",
-                                            NA)))))))))
-fn.data$Landcov <- as.factor(fn.data$Landcov)
-fn.data$Treecov <- as.numeric(fn.data$Treecov)
+########## COVARIATE SELECTION ##############
 
+# if code not run in full from above
+data <- read.csv("ndvi-fn-data.csv") 
 
+# set factors and factor levels
+data$Treecov <- as.factor(data$Treecov)
+data$Landcov <- as.factor(data$Landcov)
 
-
-## CREATE SEPARATE RES/MIG DFs ##
-res <- filter(data, MigStatus=="Res")
-mig <- filter(data, MigStatus=="Mig")
-
-
-
-
+ref.lev <- data %>%
+  dplyr::select(c(Landcov, class_name, DE)) %>%
+  group_by(class_name, landcov) %>%
+  summarise(MedianDE = median(DE)) %>%
+  arrange(MedianDE) %>% ## Order from least to most forb GDM 
+  ungroup() 
+ref.lev # so reference level is landcover type with lowest DE
+dat$landcov <- factor(dat$landcov, levels = as.vector(ref.lev$landcov))
 
 ## check for correlations
-dat.cor <- data.tmp %>%
+dat.cor <- data %>%
   dplyr::select(MigStatus, PctFN, Elevm, Landcov, Treecov, NDVI, DOY)
 source("../zMisc/pairs-panels.R")
 pairs.panels(dat.cor)
 
-#### KJB NEXT STEPS ####
 
-
-#2. rerun covariate and model selection
-#3. make your methods not suck... actually say what you did
-#4. if time, before results/disc: rerun with 2015 incl
-  #reqs: 
-    #new colxnsites_elevs_habs where pull
-      #elevs and habs from arcmap, ew (and keep lat/longs)
-    #new pathetic SDate creation code, no biggie
 
 
 #### RES/MIG FN DIFFS INCL 2015 DATA ####
@@ -160,38 +193,32 @@ t.test(fn.all[fn.all$MigStatus == "Res",]$PctFN,
        paired = FALSE, 
        var.equal = FALSE)
 
-#########################################
-#### CUT CODE/MISC UNIMPORTANT STUFF ####
 
-#### ADD RASTER DATA - TIME-INTEGRATED NDVI, NDVI AMPLITUDE ####
+#~#######################################~#
+##### CUT CODE/MISC UNIMPORTANT STUFF #####
 
-# set projections
-latlong <- CRS("+init=epsg:4326")
-stateplane <- CRS("+init=epsg:2818")
+# just realized i never made a csv of landcover classes;
+# could be handy
+write.csv(clsref, file = "landcov-classes.csv", row.names=F)
 
-# read in rasters
-ndvi.ti.sp <- raster("../Vegetation/writtenrasters/cropped/ndvi_ti_14.tif")
-ndvi.amp.sp <- raster("../Vegetation/writtenrasters/cropped/ndvi_amp_14.tif")
+# checking for diffs in landcover bt years
+tmp <- data %>%
+  mutate(lcdiff = landcov_14 - landcov_15)
+unique(tmp$lcdiff) 
+# no diffs; using same landcover values both years
 
-# reproject in wgs84 to match plot lat/longs
-ndvi.ti <- projectRaster(ndvi.ti.sp, crs = latlong)
-ndvi.amp <- projectRaster(ndvi.amp.sp, crs = latlong)
-ndvi.s <- stack(ndvi.ti, ndvi.amp)
+## CREATE SEPARATE RES/MIG DFs ##
+res <- filter(data, MigStatus=="Res")
+mig <- filter(data, MigStatus=="Mig")
 
-# create spatial dataframe of fecal n locations
-data.xy <- data.frame("x" = data.tmp$Longitude, "y" = data.tmp$Latitude)
-data.sp <- SpatialPointsDataFrame(data.xy, data.tmp, proj4string = latlong)
-ext <- raster::extract(ndvi.s, data.sp)
-data <- cbind(ext, data.tmp)
-
-# set habitat types
-#~#fn.data <- rename(fn.data, HabClass = RASTERVALU) 
-#~#fn.data <- mutate(fn.data, Landcov = ifelse(HabClass == 0, "Mask", 
-#~#                                     ifelse(HabClass == 1, "Badlands",
-#~#                                     ifelse(HabClass == 2, "Riparian",
-#~#                                     ifelse(HabClass == 3, "Forest",
-#~#                                     ifelse(HabClass == 4, "Shrub",
-#~#                                     ifelse(HabClass == 5, "Sagebrush",
-#~#                                     ifelse(HabClass == 6, "Grassland",
-#~#                                     ifelse(HabClass == 7, "Agricultural",
-#~#                                            NA)))))))))
+# old habitat types (before Kelly's sweet landcover layer)
+fn.data <- rename(fn.data, HabClass = RASTERVALU) 
+fn.data <- mutate(fn.data, Landcov = ifelse(HabClass == 0, "Mask", 
+                                     ifelse(HabClass == 1, "Badlands",
+                                     ifelse(HabClass == 2, "Riparian",
+                                     ifelse(HabClass == 3, "Forest",
+                                     ifelse(HabClass == 4, "Shrub",
+                                     ifelse(HabClass == 5, "Sagebrush",
+                                     ifelse(HabClass == 6, "Grassland",
+                                     ifelse(HabClass == 7, "Agricultural",
+                                            NA)))))))))
