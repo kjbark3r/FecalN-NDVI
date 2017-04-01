@@ -135,35 +135,47 @@ grid.arrange(p.fn.n, p.fn.e)
 ## forage biomass ##
 Cand.set <- list( )
 Cand.set[[1]] <- glm(ForageBiomass ~ NDVI, data = veg)
-Cand.set[[2]] <- glm(ForageBiomass ~ EVI, data = veg)
-Cand.set[[3]] <- glm(ForageBiomass ~ ndvi_amp, 
-                     data = veg)
-Cand.set[[4]] <- glm(ForageBiomass ~ ndvi_ti, 
-                     data = veg)
-names(Cand.set) <- c("Biomass-NDVI", "Biomass-EVI",
-                     "Biomass-NDVIamp", "Biomass-NDVIti")
+Cand.set[[2]] <- glm(ForageBiomass ~ NDVI + I(NDVI^2), data = veg)
+Cand.set[[3]] <- glm(ForageBiomass ~ NDVI + I(NDVI^2) + I(NDVI^3), data = veg)
+Cand.set[[4]] <- glm(ForageBiomass ~ EVI, data = veg)
+Cand.set[[5]] <- glm(ForageBiomass ~ EVI + I(EVI^2), data = veg)
+Cand.set[[6]] <- glm(ForageBiomass ~ ndvi_amp + I(ndvi_amp^2), data = veg)
+Cand.set[[7]] <- glm(ForageBiomass ~ ndvi_ti + I(ndvi_ti^2), data = veg)
+names(Cand.set) <- c("Biomass-NDVI", "Biomass-NDVI2", 
+                     "Biomass-NDVI3", "Biomass-EVI",
+                     "Biomass-EVI2", "Biomass-NDVIamp2", 
+                     "Biomass-NDVIti2")
 aictable1 <- aictab(Cand.set, second.ord=TRUE)
-aicresults <- print(aictable1, digits = 2, LL = FALSE)
+aicresults <- print(aictable1, digits = 2, LL = TRUE)
 
 ## digestible energy ##
 Cand.set <- list( )
 Cand.set[[1]] <- glm(DE ~ NDVI, data = veg)
-Cand.set[[2]] <- glm(DE ~ EVI, data = veg)
-Cand.set[[3]] <- glm(DE ~ ndvi_amp, data = veg)
-Cand.set[[4]] <- glm(DE ~ ndvi_ti, data = veg)
-names(Cand.set) <- c("DE-NDVI", "DE-EVI", "DE-NDVIamp",
-                     "DE-NDVIti")
+Cand.set[[2]] <- glm(DE ~ NDVI + I(NDVI^2), data = veg)
+Cand.set[[3]] <- glm(DE ~ EVI, data = veg) #unexpected
+Cand.set[[4]] <- glm(DE ~ EVI +I(EVI^2), data = veg)
+Cand.set[[5]] <- glm(DE ~ ndvi_amp, data = veg)
+Cand.set[[6]] <- glm(DE ~ ndvi_amp + I(ndvi_amp^2) + I(ndvi_amp^3), data = veg)
+Cand.set[[7]] <- glm(DE ~ ndvi_ti, data = veg)
+Cand.set[[8]] <- glm(DE ~ ndvi_ti + I(ndvi_ti^2), data = veg)
+Cand.set[[9]] <- glm(DE ~ ndvi_ti + I(ndvi_ti^2) + I(ndvi_ti^3), data = veg)
+names(Cand.set) <- c("DE-NDVI", "DE-NDVI2", "DE-EVIno",
+                     "DE-EVI2", "DE-NDVIamp", "DE-NDVI-amp3",
+                     "DE-NDVIti", "DE-NDVIti2", "DE-NDVIti3")
 aictable2 <- aictab(Cand.set, second.ord=TRUE)
-aicresults <- print(aictable2, digits = 2, LL = FALSE)
+aicresults <- print(aictable2, digits = 2, LL = TRUE)
 
 
 ## fecal nitrogen ##
 Cand.set <- list( )
 Cand.set[[1]] <- glm(PctFN ~ NDVI, data = fn)
-Cand.set[[2]] <- glm(PctFN ~ EVI, data = fn)
-names(Cand.set) <- c("FN-NDVI", "FN-EVI")
+Cand.set[[2]] <- glm(PctFN ~ NDVI + I(NDVI^2) + I(NDVI^3), data = fn)
+Cand.set[[3]] <- glm(PctFN ~ EVI, data = fn)
+Cand.set[[4]] <- glm(PctFN ~ EVI + I(EVI^2) + I(EVI^3), data = fn)
+names(Cand.set) <- c("FN-NDVI", "FN-NDVI3",
+                     "FN-EVI", "FN-EVI3")
 aictable3 <- aictab(Cand.set, second.ord=TRUE)
-aicresults <- print(aictable3, digits = 2, LL = FALSE)
+aicresults <- print(aictable3, digits = 2, LL = TRUE)
 
 ## store and export results ##
 aictab.all <- rbind(aictable1, aictable2, aictable3)
