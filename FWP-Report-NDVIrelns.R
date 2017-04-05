@@ -33,7 +33,8 @@ bm <- read.csv("../Vegetation/biomass-plot-summeronly.csv")
 fq <- read.csv("../Vegetation/de-plot-summeronly.csv")
 fn <- read.csv("ndvi-fn-data.csv")
 ndvi.ti.amp <- read.csv("../Vegetation/DE-model-data.csv") %>%
-  select(PlotVisit, ndvi_amp, ndvi_ti)
+  select(PlotVisit, landcov, ndvi_amp, ndvi_ti) %>%
+  rename(Landcov = landcov)
 
 # fix classes of fecal n data
 fn$Date <- as.Date(fn$Date)
@@ -51,13 +52,6 @@ vegtmp <- fq %>%
 vegtmp <- vegtmp[!is.na(vegtmp$Latitude),]
 
 # add tree cover
-latlong <- CRS("+init=epsg:4326")
-stateplane <- CRS("+init=epsg:2818")
-lc14 <- raster("../vegetation/writtenrasters/covs2014/landcov_14.tif")
-data.xy <- data.frame("x" = vegtmp$Longitude, "y" = vegtmp$Latitude)
-data.ll <- SpatialPointsDataFrame(data.xy, vegtmp, proj4string = latlong)
-data.sp <- spTransform(data.ll, stateplane)
-ext <- raster::extract(lc14, data.sp) # same as lv15, verified
 clsref <- data.frame(Landcov = c(1,2,3,4,5,6,7,8,9,10,11,12),
                      ClassName = c("Mesic Forest (Burn >15)", #1
                                     "Dry Forest (Burn >15)", #2 
@@ -71,9 +65,7 @@ clsref <- data.frame(Landcov = c(1,2,3,4,5,6,7,8,9,10,11,12),
                                     "Mesic Forest Burn 0-5",#10
                                     "Mesic Forest Burn 6-15", #11
                                     "Rx Dry Forest Burn 0-5")) #12
-vegtmp.a <- cbind(vegtmp, ext)
-veg <- vegtmp.a %>%
-  rename(Landcov = ext) %>%
+veg <- vegtmp %>%
   left_join(clsref, by = "Landcov") %>%
   mutate(Treecov = ifelse(Landcov == 1, "1", 
                    ifelse(Landcov == 2, "1",
@@ -90,153 +82,255 @@ veg <- vegtmp.a %>%
                           NA))))))))))))) 
 veg$Treecov <- as.factor(veg$Treecov)
         
-
+#### biomass without outliers####
+# (anomalous NDVI and biomass numbers) #
+veg2 <- filter(veg, ForageBiomass < 1000,
+               NDVI > 2500)
 
 ########## ANALYSES ##############
 
 
-#### model selection - which remotely-sensed index? ####
+#### model selection ####
 
 ## forage biomass ##
 Cand.set <- list( )
-Cand.set[[1]] <- glm(ForageBiomass ~ NDVI, data = veg)
-Cand.set[[2]] <- glm(ForageBiomass ~ NDVI + I(NDVI^2), data = veg)
-Cand.set[[3]] <- glm(ForageBiomass ~ NDVI + I(NDVI^2) + I(NDVI^3), data = veg)
-Cand.set[[4]] <- glm(ForageBiomass ~ EVI, data = veg)
-Cand.set[[5]] <- glm(ForageBiomass ~ EVI + I(EVI^2), data = veg)
-Cand.set[[6]] <- glm(ForageBiomass ~ ndvi_amp + I(ndvi_amp^2), data = veg)
-Cand.set[[7]] <- glm(ForageBiomass ~ ndvi_ti + I(ndvi_ti^2), data = veg)
-names(Cand.set) <- c("Biomass-NDVI", "Biomass-NDVI2", 
-                     "Biomass-NDVI3", "Biomass-EVI",
-                     "Biomass-EVI2", "Biomass-NDVIamp2", 
-                     "Biomass-NDVIti2")
+Cand.set[[1]] <- lm(ForageBiomass ~ NDVI, data = veg2)
+Cand.set[[2]] <- lm(ForageBiomass ~ NDVI + I(NDVI^2), data = veg2)
+Cand.set[[3]] <- lm(ForageBiomass ~ NDVI + I(NDVI^2) + I(NDVI^3), data = veg2)
+Cand.set[[4]] <- lm(ForageBiomass ~ EVI, data = veg2)
+Cand.set[[5]] <- lm(ForageBiomass ~ EVI + I(EVI^2), data = veg2)
+Cand.set[[6]] <- lm(ForageBiomass ~ EVI + I(EVI^2) + I(EVI^3), data = veg2)
+Cand.set[[7]] <- lm(ForageBiomass ~ ndvi_amp, data = veg2)
+Cand.set[[8]] <- lm(ForageBiomass ~ ndvi_amp + I(ndvi_amp^2), data = veg2)
+Cand.set[[9]] <- lm(ForageBiomass ~ ndvi_amp + I(ndvi_amp^2) + I(ndvi_amp^3), data = veg2)
+Cand.set[[10]] <- lm(ForageBiomass ~ ndvi_ti, data = veg2)
+Cand.set[[11]] <- lm(ForageBiomass ~ ndvi_ti + I(ndvi_ti^2), data = veg2)
+Cand.set[[12]] <- lm(ForageBiomass ~ ndvi_ti + I(ndvi_ti^2) + I(ndvi_ti^3), data = veg2)
+Cand.set[[13]] <- lm(ForageBiomass ~ NDVI*Treecov, data = veg2)
+Cand.set[[14]] <- lm(ForageBiomass ~ NDVI*Treecov + I(NDVI^2)*Treecov, data = veg2)
+Cand.set[[15]] <- lm(ForageBiomass ~ NDVI*Treecov + I(NDVI^2)*Treecov + I(NDVI^3)*Treecov, data = veg2)
+Cand.set[[16]] <- lm(ForageBiomass ~ EVI*Treecov, data = veg2)
+Cand.set[[17]] <- lm(ForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov, data = veg2)
+Cand.set[[18]] <- lm(ForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov + I(EVI^3)*Treecov, data = veg2)
+Cand.set[[19]] <- lm(ForageBiomass ~ ndvi_amp*Treecov, data = veg2)
+Cand.set[[20]] <- lm(ForageBiomass ~ ndvi_amp*Treecov + I(ndvi_amp^2)*Treecov, data = veg2)
+Cand.set[[21]] <- lm(ForageBiomass ~ ndvi_amp*Treecov + I(ndvi_amp^2)*Treecov + I(ndvi_amp^3)*Treecov, data = veg2)
+Cand.set[[22]] <- lm(ForageBiomass ~ ndvi_ti*Treecov, data = veg2)
+Cand.set[[23]] <- lm(ForageBiomass ~ ndvi_ti*Treecov + I(ndvi_ti^2)*Treecov, data = veg2)
+Cand.set[[24]] <- lm(ForageBiomass ~ ndvi_ti*Treecov + I(ndvi_ti^2)*Treecov + I(ndvi_ti^3)*Treecov, data = veg2)
+names(Cand.set) <- c("Biomass-NDVI", "Biomass-NDVI2", "Biomass-NDVI3", 
+                     "Biomass-EVI","Biomass-EVI2", "Biomass-EVI3",
+                     "Biomass-NDVIamp", "Biomass-NDVIamp2", "Biomass-NDVIamp3",
+                     "Biomass-NDVIti", "Biomass-NDVI2ti", "Biomass-NDVI3ti",
+                     "Biomass-NDVI*TC", "Biomass-NDVI2*TC", "Biomass-NDVI3*TC", 
+                     "Biomass-EVI*TC","Biomass-EVI2*TC", "Biomass-EVI3*TC",
+                     "Biomass-NDVIamp*TC", "Biomass-NDVIamp2*TC", "Biomass-NDVIamp3*TC",
+                     "Biomass-NDVIti*TC", "Biomass-NDVI2ti*TC", "Biomass-NDVI3ti*TC")
 aictable1 <- aictab(Cand.set, second.ord=TRUE)
 aicresults <- print(aictable1, digits = 2, LL = TRUE)
 
-## digestible energy ##
+## herbaceous forage biomass ##
 Cand.set <- list( )
-Cand.set[[1]] <- glm(DE ~ NDVI, data = veg)
-Cand.set[[2]] <- glm(DE ~ NDVI + I(NDVI^2), data = veg)
-Cand.set[[3]] <- glm(DE ~ EVI, data = veg) #unexpected
-Cand.set[[4]] <- glm(DE ~ EVI +I(EVI^2), data = veg)
-Cand.set[[5]] <- glm(DE ~ ndvi_amp, data = veg)
-Cand.set[[6]] <- glm(DE ~ ndvi_amp + I(ndvi_amp^2) + I(ndvi_amp^3), data = veg)
-Cand.set[[7]] <- glm(DE ~ ndvi_ti, data = veg)
-Cand.set[[8]] <- glm(DE ~ ndvi_ti + I(ndvi_ti^2), data = veg)
-Cand.set[[9]] <- glm(DE ~ ndvi_ti + I(ndvi_ti^2) + I(ndvi_ti^3), data = veg)
-names(Cand.set) <- c("DE-NDVI", "DE-NDVI2", "DE-EVIno",
-                     "DE-EVI2", "DE-NDVIamp", "DE-NDVI-amp3",
-                     "DE-NDVIti", "DE-NDVIti2", "DE-NDVIti3")
+Cand.set[[1]] <- lm(HerbaceousForageBiomass ~ NDVI, data = veg2)
+Cand.set[[2]] <- lm(HerbaceousForageBiomass ~ NDVI + I(NDVI^2), data = veg2)
+Cand.set[[3]] <- lm(HerbaceousForageBiomass ~ NDVI + I(NDVI^2) + I(NDVI^3), data = veg2)
+Cand.set[[4]] <- lm(HerbaceousForageBiomass ~ EVI, data = veg2)
+Cand.set[[5]] <- lm(HerbaceousForageBiomass ~ EVI + I(EVI^2), data = veg2)
+Cand.set[[6]] <- lm(HerbaceousForageBiomass ~ EVI + I(EVI^2) + I(EVI^3), data = veg2)
+Cand.set[[7]] <- lm(HerbaceousForageBiomass ~ ndvi_amp, data = veg2)
+Cand.set[[8]] <- lm(HerbaceousForageBiomass ~ ndvi_amp + I(ndvi_amp^2), data = veg2)
+Cand.set[[9]] <- lm(HerbaceousForageBiomass ~ ndvi_amp + I(ndvi_amp^2) + I(ndvi_amp^3), data = veg2)
+Cand.set[[10]] <- lm(HerbaceousForageBiomass ~ ndvi_ti, data = veg2)
+Cand.set[[11]] <- lm(HerbaceousForageBiomass ~ ndvi_ti + I(ndvi_ti^2), data = veg2)
+Cand.set[[12]] <- lm(HerbaceousForageBiomass ~ ndvi_ti + I(ndvi_ti^2) + I(ndvi_ti^3), data = veg2)
+Cand.set[[13]] <- lm(HerbaceousForageBiomass ~ NDVI*Treecov, data = veg2)
+Cand.set[[14]] <- lm(HerbaceousForageBiomass ~ NDVI*Treecov + I(NDVI^2)*Treecov, data = veg2)
+Cand.set[[15]] <- lm(HerbaceousForageBiomass ~ NDVI*Treecov + I(NDVI^2)*Treecov + I(NDVI^3)*Treecov, data = veg2)
+Cand.set[[16]] <- lm(HerbaceousForageBiomass ~ EVI*Treecov, data = veg2)
+Cand.set[[17]] <- lm(HerbaceousForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov, data = veg2)
+Cand.set[[18]] <- lm(HerbaceousForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov + I(EVI^3)*Treecov, data = veg2)
+Cand.set[[19]] <- lm(HerbaceousForageBiomass ~ ndvi_amp*Treecov, data = veg2)
+Cand.set[[20]] <- lm(HerbaceousForageBiomass ~ ndvi_amp*Treecov + I(ndvi_amp^2)*Treecov, data = veg2)
+Cand.set[[21]] <- lm(HerbaceousForageBiomass ~ ndvi_amp*Treecov + I(ndvi_amp^2)*Treecov + I(ndvi_amp^3)*Treecov, data = veg2)
+Cand.set[[22]] <- lm(HerbaceousForageBiomass ~ ndvi_ti*Treecov, data = veg2)
+Cand.set[[23]] <- lm(HerbaceousForageBiomass ~ ndvi_ti*Treecov + I(ndvi_ti^2)*Treecov, data = veg2)
+Cand.set[[24]] <- lm(HerbaceousForageBiomass ~ ndvi_ti*Treecov + I(ndvi_ti^2)*Treecov + I(ndvi_ti^3)*Treecov, data = veg2)
+names(Cand.set) <- c("HerbBiomass-NDVI", "HerbBiomass-NDVI2", "HerbBiomass-NDVI3", 
+                     "HerbBiomass-EVI","HerbBiomass-EVI2", "HerbBiomass-EVI3",
+                     "HerbBiomass-NDVIamp", "HerbBiomass-NDVIamp2", "HerbBiomass-NDVIamp3",
+                     "HerbBiomass-NDVIti", "HerbBiomass-NDVI2ti", "HerbBiomass-NDVI3ti",
+                     "HerbBiomass-NDVI*TC", "HerbBiomass-NDVI2*TC", "HerbBiomass-NDVI3*TC", 
+                     "HerbBiomass-EVI*TC","HerbBiomass-EVI2*TC", "HerbBiomass-EVI3*TC",
+                     "HerbBiomass-NDVIamp*TC", "HerbBiomass-NDVIamp2*TC", "HerbBiomass-NDVIamp3*TC",
+                     "HerbBiomass-NDVIti*TC", "HerbBiomass-NDVI2ti*TC", "HerbBiomass-NDVI3ti*TC")
 aictable2 <- aictab(Cand.set, second.ord=TRUE)
 aicresults <- print(aictable2, digits = 2, LL = TRUE)
 
 
-## fecal nitrogen ##
-Cand.set <- list( )
-Cand.set[[1]] <- glm(PctFN ~ NDVI, data = fn)
-Cand.set[[2]] <- glm(PctFN ~ NDVI + I(NDVI^2) + I(NDVI^3), data = fn)
-Cand.set[[3]] <- glm(PctFN ~ EVI, data = fn)
-Cand.set[[4]] <- glm(PctFN ~ EVI + I(EVI^2) + I(EVI^3), data = fn)
-names(Cand.set) <- c("FN-NDVI", "FN-NDVI3",
-                     "FN-EVI", "FN-EVI3")
-aictable3 <- aictab(Cand.set, second.ord=TRUE)
-aicresults <- print(aictable3, digits = 2, LL = TRUE)
-
-## store and export results ##
-aictab.all <- rbind(aictable1, aictable2, aictable3)
-write.csv(aictab.all, file = "aic-results.csv", row.names = F)
-
-
-#### model selection - tree cover? ####
-
-
-## forage biomass ##
-Cand.set <- list( )
-Cand.set[[1]] <- glm(ForageBiomass ~ NDVI + I(NDVI^2) + I(NDVI^3), data = veg)
-Cand.set[[2]] <- glm(ForageBiomass ~ NDVI*Treecov + I(NDVI^2)*Treecov + I(NDVI^3)*Treecov, data = veg)
-names(Cand.set) <- c("B-NDVI3", "B-NDVI3*Treecov")
-aictable4 <- aictab(Cand.set, second.ord=TRUE)
-aicresults <- print(aictable4, digits = 2, LL = TRUE)
-
-
 ## digestible energy ##
 Cand.set <- list( )
-Cand.set[[1]] <- glm(DE ~ ndvi_amp + I(ndvi_amp^2) + I(ndvi_amp^3), data = veg)
-Cand.set[[2]] <- glm(DE ~ ndvi_amp, data = veg)
-Cand.set[[3]] <- glm(DE ~ ndvi_amp*Treecov + I(ndvi_amp^2)*Treecov + I(ndvi_amp^3)*Treecov, data = veg)
-Cand.set[[4]] <- glm(DE ~ ndvi_amp*Treecov, data = veg)
-names(Cand.set) <- c("DE-NDVIamp3", "DE-NDVIamp",
-                     "DE-NDVIamp3*Treecov", "DE-NDVIamp*Treecov")
-aictable5 <- aictab(Cand.set, second.ord=TRUE)
-aicresults <- print(aictable5, digits = 2, LL = TRUE)
+Cand.set[[1]] <- lm(DE ~ NDVI, data = veg2)
+Cand.set[[2]] <- lm(DE ~ NDVI + I(NDVI^2), data = veg2)
+Cand.set[[3]] <- lm(DE ~ NDVI + I(NDVI^2) + I(NDVI^3), data = veg2)
+Cand.set[[4]] <- lm(DE ~ EVI, data = veg2)
+Cand.set[[5]] <- lm(DE ~ EVI + I(EVI^2), data = veg2)
+Cand.set[[6]] <- lm(DE ~ EVI + I(EVI^2) + I(EVI^3), data = veg2)
+Cand.set[[7]] <- lm(DE ~ ndvi_amp, data = veg2)
+Cand.set[[8]] <- lm(DE ~ ndvi_amp + I(ndvi_amp^2), data = veg2)
+Cand.set[[9]] <- lm(DE ~ ndvi_amp + I(ndvi_amp^2) + I(ndvi_amp^3), data = veg2)
+Cand.set[[10]] <- lm(DE ~ ndvi_ti, data = veg2)
+Cand.set[[11]] <- lm(DE ~ ndvi_ti + I(ndvi_ti^2), data = veg2)
+Cand.set[[12]] <- lm(DE ~ ndvi_ti + I(ndvi_ti^2) + I(ndvi_ti^3), data = veg2)
+Cand.set[[13]] <- lm(DE ~ NDVI*Treecov, data = veg2)
+Cand.set[[14]] <- lm(DE ~ NDVI*Treecov + I(NDVI^2)*Treecov, data = veg2)
+Cand.set[[15]] <- lm(DE ~ NDVI*Treecov + I(NDVI^2)*Treecov + I(NDVI^3)*Treecov, data = veg2)
+Cand.set[[16]] <- lm(DE ~ EVI*Treecov, data = veg2)
+Cand.set[[17]] <- lm(DE ~ EVI*Treecov + I(EVI^2)*Treecov, data = veg2)
+Cand.set[[18]] <- lm(DE ~ EVI*Treecov + I(EVI^2)*Treecov + I(EVI^3)*Treecov, data = veg2)
+Cand.set[[19]] <- lm(DE ~ ndvi_amp*Treecov, data = veg2)
+Cand.set[[20]] <- lm(DE ~ ndvi_amp*Treecov + I(ndvi_amp^2)*Treecov, data = veg2)
+Cand.set[[21]] <- lm(DE ~ ndvi_amp*Treecov + I(ndvi_amp^2)*Treecov + I(ndvi_amp^3)*Treecov, data = veg2)
+Cand.set[[22]] <- lm(DE ~ ndvi_ti*Treecov, data = veg2)
+Cand.set[[23]] <- lm(DE ~ ndvi_ti*Treecov + I(ndvi_ti^2)*Treecov, data = veg2)
+Cand.set[[24]] <- lm(DE ~ ndvi_ti*Treecov + I(ndvi_ti^2)*Treecov + I(ndvi_ti^3)*Treecov, data = veg2)
+names(Cand.set) <- c("DE-NDVI", "DE-NDVI2", "DE-NDVI3", 
+                     "DE-EVI","DE-EVI2", "DE-EVI3",
+                     "DE-NDVIamp", "DE-NDVIamp2", "DE-NDVIamp3",
+                     "DE-NDVIti", "DE-NDVI2ti", "DE-NDVI3ti",
+                     "DE-NDVI*TC", "DE-NDVI2*TC", "DE-NDVI3*TC", 
+                     "DE-EVI*TC","DE-EVI2*TC", "DE-EVI3*TC",
+                     "DE-NDVIamp*TC", "DE-NDVIamp2*TC", "DE-NDVIamp3*TC",
+                     "DE-NDVIti*TC", "DE-NDVI2ti*TC", "DE-NDVI3ti*TC")
+aictable3 <- aictab(Cand.set, second.ord=TRUE)
+aicresults <- print(aictable3, digits = 2, LL = TRUE)
 
 
 ## fecal nitrogen ##
 Cand.set <- list( )
 Cand.set[[1]] <- lm(PctFN ~ NDVI, data = fn)
-Cand.set[[2]] <- lm(PctFN ~ NDVI*Treecov, data = fn)
-names(Cand.set) <- c("FN-NDVI", "FN-NDVI*Treecov")
-aictable6 <- aictab(Cand.set, second.ord=TRUE)
-aicresults <- print(aictable6, digits = 2, LL = TRUE)
+Cand.set[[2]] <- lm(PctFN ~ NDVI + I(NDVI^2), data = fn)
+Cand.set[[3]] <- lm(PctFN ~ NDVI + I(NDVI^2) + I(NDVI^3), data = fn)
+Cand.set[[4]] <- lm(PctFN ~ EVI, data = fn)
+Cand.set[[5]] <- lm(PctFN ~ EVI + I(EVI^2), data = fn)
+Cand.set[[6]] <- lm(PctFN ~ EVI + I(EVI^2) + I(EVI^3), data = fn)
+Cand.set[[7]] <- lm(PctFN ~ NDVI*Treecov, data = fn)
+Cand.set[[8]] <- lm(PctFN ~ NDVI*Treecov + I(NDVI^2)*Treecov, data = fn)
+Cand.set[[9]] <- lm(PctFN ~ NDVI*Treecov + I(NDVI^2)*Treecov + I(NDVI^3)*Treecov, data = fn)
+Cand.set[[10]] <- lm(PctFN ~ EVI*Treecov, data = fn)
+Cand.set[[11]] <- lm(PctFN ~ EVI*Treecov + I(EVI^2)*Treecov, data = fn)
+Cand.set[[12]] <- lm(PctFN ~ EVI*Treecov + I(EVI^2)*Treecov + I(EVI^3)*Treecov, data = fn)
+names(Cand.set) <- c("FN-NDVI", "FN-NDVI2", "FN-NDVI3", 
+                     "FN-EVI","FN-EVI2", "FN-EVI3",
+                     "FN-NDVI*TC", "FN-NDVI2*TC", "FN-NDVI3*TC", 
+                     "FN-EVI*TC","FN-EVI2*TC", "FN-EVI3*TC")
+aictable4 <- aictab(Cand.set, second.ord=TRUE)
+aicresults <- print(aictable4, digits = 2, LL = TRUE)
+
 
 ## store and export results ##
-aictab.all2 <- rbind(aictable4, aictable5, aictable6)
-write.csv(aictab.all2, file = "aic-results-treecov.csv", row.names = F)
+aictab.all <- rbind(aictable1, aictable2, aictable3, aictable4)
+write.csv(aictab.all, file = "aic-results.csv", row.names = F)
 
 
 #### top models ####
+## kristin you pasted this in to cut stuff already
+## so update as you go
 
 par(mfrow=c(2,2))
 
-top.bm <- lm(ForageBiomass ~ NDVI, data = veg)
+top.bm <- lm(ForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov, data = veg2)
 summary(top.bm)
 plot(top.bm)
 
-top.de2 <- lm(DE ~ ndvi_amp*Treecov + I(ndvi_amp^2)*Treecov + I(ndvi_amp^3)*Treecov, data = veg)
-summary(top.de2)
-plot(top.de2)
+top.bmh <- lm(HerbaceousForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov + I(EVI^3)*Treecov, data = veg2)
+summary(top.bmh)
+plot(top.bmh)
 
-top.de1 <- lm(DE ~ ndvi_amp*Treecov, data = veg)
-summary(top.de1)
-plot(top.de1)
+top.de <- lm(DE ~ ndvi_ti*Treecov + I(ndvi_ti^2)*Treecov + I(ndvi_ti^3)*Treecov, data = veg2)
+summary(top.de)
+plot(top.de)
 
-top.fn1 <- lm(PctFN ~ NDVI, data = fn)
-summary(top.fn1)
-plot(top.fn1)
+top.fn <- lm(PctFN ~ EVI*Treecov, data = fn)
+summary(top.fn)
+plot(top.fn)
 
-top.fn2 <- lm(PctFN ~ EVI, data = fn)
-summary(top.fn2)
-plot(top.fn2)
+## all supported models ##
+m1 <- lm(ForageBiomass ~ NDVI, data = veg2)
+m2 <- lm(ForageBiomass ~ EVI*Treecov, data = veg2)
+m3 <- lm(ForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov, data = veg2)
+m4 <- lm(ForageBiomass ~ NDVI + I(NDVI^2), data = veg2)
+m5 <- lm(HerbaceousForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov + I(EVI^3)*Treecov, data = veg2)
+m6 <- lm(HerbaceousForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov, data = veg2)
+m7 <- lm(DE ~ ndvi_ti*Treecov + I(ndvi_ti^2)*Treecov + I(ndvi_ti^3)*Treecov, data = veg2)
+m8 <- lm(DE ~ ndvi_amp*Treecov + I(ndvi_amp^2)*Treecov, data = veg2)
+m9 <- lm(PctFN ~ EVI*Treecov, data = fn)
+m10 <- lm(PctFN ~ NDVI, data = fn)
+m11 <- lm(PctFN ~ EVI, data = fn)
 
-lm1 <- c(top.bm$coefficients[1], 
-         summary(top.bm)$adj.r.squared, 
-         summary(top.bm)$sigma)
-lm2 <- c(top.de1$coefficients[1], 
-         summary(top.de1)$adj.r.squared, 
-         summary(top.de1)$sigma)
-lm3 <- c(top.de2$coefficients[1], 
-         summary(top.de2)$adj.r.squared, 
-         summary(top.de2)$sigma)
-lm4 <- c(top.fn$coefficients[1], 
-         summary(top.fn)$adj.r.squared, 
-         summary(top.fn)$sigma)
+lm1 <- c(m1$coefficients[1], 
+         summary(m1)$adj.r.squared, 
+         summary(m1)$sigma)
+lm2 <- c(m2$coefficients[1], 
+         summary(m2)$adj.r.squared, 
+         summary(m2)$sigma)
+lm3 <- c(m3$coefficients[1], 
+         summary(m3)$adj.r.squared, 
+         summary(m3)$sigma)
+lm4 <- c(m4$coefficients[1], 
+         summary(m4)$adj.r.squared, 
+         summary(m4)$sigma)
+lm5 <- c(m5$coefficients[1], 
+         summary(m5)$adj.r.squared, 
+         summary(m5)$sigma)
+lm6 <- c(m6$coefficients[1], 
+         summary(m6)$adj.r.squared, 
+         summary(m6)$sigma)
+lm7 <- c(m7$coefficients[1], 
+         summary(m7)$adj.r.squared, 
+         summary(m7)$sigma)
+lm8 <- c(m8$coefficients[1], 
+         summary(m8)$adj.r.squared, 
+         summary(m8)$sigma)
+lm9 <- c(m9$coefficients[1], 
+         summary(m9)$adj.r.squared, 
+         summary(m9)$sigma)
+lm10 <- c(m10$coefficients[1], 
+         summary(m10)$adj.r.squared, 
+         summary(m10)$sigma)
+lm11 <- c(m11$coefficients[1], 
+         summary(m11)$adj.r.squared, 
+         summary(m11)$sigma)
 
-tprep <- rbind(lm1, lm2, lm3, lm4)
+
+tprep <- rbind(lm1, lm2, lm3, lm4, lm5, lm6, lm7, lm8, lm9, lm10, lm11)
 tab <- as.data.frame(tprep, row.names = 
-                       c("Biomass-NDVI", 
-                         "DE-NDVIamp*Treecov", 
-                         "DE-NDVIamp3*Treecov",
-                         "FN-NDVI"))
+                       c("B-NDVI", "B-EVI*T", "B-EVI2*T",
+                         "B-NDVI2", "HB-EVI3*T", "HB-EVI2*T",
+                         "DE-NDVIti3*T", "DE-NDVIa2*T",
+                         "FN-EVI*T", "FN-NDVI", "FN-EVI"))
 tab <- rename(tab, AdjRsquared = V2)
 tab <- rename(tab, StdError = V3)
 View(tab)
 write.csv(tab, file = "regressions.csv")
 
 
-#### biomass without outliers ####
-veg2 <- filter(veg, ForageBiomass < 1000)
-test <- lm(ForageBiomass ~ NDVI, data = veg2)
-plot(test)
+#### top model summaries ####
+
+summary(lm(ForageBiomass ~ NDVI, data = veg2))
+summary(lm(ForageBiomass ~ EVI*Treecov, data = veg2))
+summary(lm(ForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov, data = veg2))
+summary(lm(HerbaceousForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov + I(EVI^3)*Treecov, data = veg2))
+summary(lm(HerbaceousForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov, data = veg2))
+summary(lm(DE ~ ndvi_ti*Treecov + I(ndvi_ti^2)*Treecov + I(ndvi_ti^3)*Treecov, data = veg2))
+summary(lm(DE ~ ndvi_amp*Treecov + I(ndvi_amp^2)*Treecov, data = veg2))
+summary(lm(PctFN ~ EVI*Treecov, data = fn))
+summary(lm(PctFN ~ NDVI, data = fn))
+summary(m(PctFN ~ EVI, data = fn))
+
+
+#### quick data summaries ####
+length(unique(veg2$PlotVisit))
+
 
 #### VISUALS ####
 
@@ -244,167 +338,106 @@ plot(test)
 
 
 ## forage biomass - loess smoother ##
-p.bm.n <- ggplot(veg, aes(x = NDVI, y = ForageBiomass)) +
-  geom_smooth(method = "loess", color = "black")
-p.bm.e <- ggplot(veg, aes(x = EVI, y = ForageBiomass)) +
-  geom_smooth(method = "loess", color = "black")
-p.bm.na <- ggplot(veg, aes(x = ndvi_amp, y = ForageBiomass)) +
-  geom_smooth(method = "loess", color = "black")
-p.bm.nt <- ggplot(veg, aes(x = ndvi_ti, y = ForageBiomass)) +
-  geom_smooth(method = "loess", color = "black")
-grid.arrange(p.bm.n, p.bm.e, p.bm.na, p.bm.nt)
+p.bm.n <- ggplot(veg2, aes(x = NDVI, y = ForageBiomass)) +
+  geom_smooth(method = "loess", color = "black") +
+  geom_point(size = 0.5) +
+  labs(x = "NDVI", y = expression(paste(
+                        "Forage Biomass (g/", 
+                         m^2, ")", sep="")))
+p.bm.e <- ggplot(veg2, aes(x = EVI, y = ForageBiomass)) +
+  geom_smooth(method = "loess", color = "black") +
+  geom_point(size = 0.5) +
+  labs(x = "EVI", y = "")
+p.bm.na <- ggplot(veg2, aes(x = ndvi_amp, y = ForageBiomass)) +
+  geom_smooth(method = "loess", color = "black") +
+  geom_point(size = 0.5) +
+  labs(x = "NDVI amplitude", y = "")
+p.bm.nt <- ggplot(veg2, aes(x = ndvi_ti, y = ForageBiomass)) +
+  geom_smooth(method = "loess", color = "black") +
+  geom_point(size = 0.5) +
+  labs(x = "Time-integrated NDVI", y = "")
+#grid.arrange(p.bm.n, p.bm.e, p.bm.na, p.bm.nt)
+
+
+
+## herbaceous forage biomass - loess smoother ##
+p.bmh.n <- ggplot(veg2, aes(x = NDVI, y = HerbaceousForageBiomass)) +
+  geom_smooth(method = "loess", color = "black") +
+  geom_point(size = 0.5) +
+  labs(x = "NDVI", y = expression(paste(
+                        "Herbaceous \nForage Biomass (g/", 
+                         m^2, ")", sep="")))
+p.bmh.e <- ggplot(veg2, aes(x = EVI, y = HerbaceousForageBiomass)) +
+  geom_smooth(method = "loess", color = "black") +
+  geom_point(size = 0.5) +
+  labs(x = "EVI", y = "")
+p.bmh.na <- ggplot(veg2, aes(x = ndvi_amp, y = HerbaceousForageBiomass)) +
+  geom_smooth(method = "loess", color = "black") +
+  geom_point(size = 0.5) +
+  labs(x = "NDVI amplitude", y = "")
+p.bmh.nt <- ggplot(veg2, aes(x = ndvi_ti, y = HerbaceousForageBiomass)) +
+  geom_smooth(method = "loess", color = "black") +
+  geom_point(size = 0.5) +
+  labs(x = "Time-integrated NDVI", y = "")
+#grid.arrange(p.bmh.n, p.bmh.e, p.bmh.na, p.bmh.nt)
+
 
 
 ## digestible energy ##
-p.de.n <- ggplot(veg, aes(x = NDVI, y = DE)) +
-  geom_smooth(method = "loess", color = "black")
-p.de.e <- ggplot(veg, aes(x = EVI, y = DE)) +
-  geom_smooth(method = "loess", color = "black")
-p.de.na <- ggplot(veg, aes(x = ndvi_amp, y = DE)) +
-  geom_smooth(method = "loess", color = "black")
-p.de.nt <- ggplot(veg, aes(x = ndvi_ti, y = DE)) +
-  geom_smooth(method = "loess", color = "black")
-grid.arrange(p.de.n, p.de.e, p.de.na, p.de.nt)
+p.de.n <- ggplot(veg2, aes(x = NDVI, y = DE)) +
+  geom_smooth(method = "loess", color = "black") +
+  geom_point(size = 0.5) +
+  labs(x = "NDVI", y = "Digestible Energy (kcal/g)")
+p.de.e <- ggplot(veg2, aes(x = EVI, y = DE)) +
+  geom_smooth(method = "loess", color = "black") +
+  geom_point(size = 0.5) +
+  labs(x = "EVI", y = "")
+p.de.na <- ggplot(veg2, aes(x = ndvi_amp, y = DE)) +
+  geom_smooth(method = "loess", color = "black") +
+  geom_point(size = 0.5) +
+  labs(x = "NDVI amplitude", y = "")
+p.de.nt <- ggplot(veg2, aes(x = ndvi_ti, y = DE)) +
+  geom_smooth(method = "loess", color = "black") +
+  geom_point(size = 0.5) +
+  labs(x = "Time-integrated NDVI", y = "")
+#grid.arrange(p.de.n, p.de.e, p.de.na, p.de.nt)
 
 
 ## fecal nitrogen ##
 p.fn.n <- ggplot(fn, aes(x = NDVI, y = PctFN)) +
-  geom_smooth(method = "loess", color = "black")
+  geom_smooth(method = "loess", color = "black") +
+  geom_point(size = 0.5) +
+  labs(x = "NDVI", y = "Fecal Nitrogen (%)")
 p.fn.e <- ggplot(fn, aes(x = EVI, y = PctFN)) +
-  geom_smooth(method = "loess", color = "black")
-grid.arrange(p.fn.n, p.fn.e)
+  geom_smooth(method = "loess", color = "black") +
+  geom_point(size = 0.5) +
+  labs(x = "EVI", y = "")
+#grid.arrange(p.fn.n, p.fn.e)
 
+## all together, hopefully ##
+grid.arrange(p.bm.n, p.bm.e, p.bm.na, p.bm.nt,
+             p.bmh.n, p.bmh.e, p.bmh.na, p.bmh.nt,
+             p.de.n, p.de.e, p.de.na, p.de.nt,
+             p.fn.n, p.fn.e)
 
-#### interaction bt tree cover and NDVI for DE ####
-ggplot(veg, aes(x=ndvi_amp, y=DE, fill=Treecov)) + 
-  stat_smooth(method="glm", 
+#### how tree cover affects responses ####
+
+p.bm.tc <- ggplot(veg2, aes(x=EVI, y=ForageBiomass, fill=Treecov)) +
+    stat_smooth(method="glm", 
+              method.args = list(family="gaussian"), 
+              level=0.95)
+p.bm.tc
+
+p.de.tc <- ggplot(veg2, aes(x=ndvi_amp, y=DE, fill=Treecov)) +
+    stat_smooth(method="glm", 
+              method.args = list(family="gaussian"), 
+              level=0.95) 
+
+p.fn.tc <- ggplot(fn, aes(x=EVI, y=PctFN, fill=Treecov)) +
+    stat_smooth(method="glm", 
               method.args = list(family="gaussian"), 
               level=0.95) 
 
 
 
 
-
-
-
-
-#~##############~##~##############~##~##############~#
-#### CUT CODE ####
-
-## univariate relationships w ndvi ##
-
-mbm <- lm(ForageBiomass ~ NDVI, data = veg)
-summary(mbm)
-par(mfrow=c(2,2))
-plot(mbm)
-
-mfq <- lm(DE ~ NDVI, data = veg)
-summary(mfq)
-plot(mfq)
-
-mfn <- lm(PctFN ~ NDVI, data = fn)
-summary(mfn)
-plot(mfn)
-
-
-
-### glm-smoothed plots ###
-
-## forage biomass - glm smoother ##
-p.bm.n <- ggplot(veg, aes(x = NDVI, y = ForageBiomass)) +
-  geom_smooth(method = "glm", color = "black")
-p.bm.e <- ggplot(veg, aes(x = EVI, y = ForageBiomass)) +
-  geom_smooth(method = "glm", color = "black")
-p.bm.na <- ggplot(veg, aes(x = ndvi_amp, y = ForageBiomass)) +
-  geom_smooth(method = "glm", color = "black")
-p.bm.nt <- ggplot(veg, aes(x = ndvi_ti, y = ForageBiomass)) +
-  geom_smooth(method = "glm", color = "black")
-grid.arrange(p.bm.n, p.bm.e, p.bm.na, p.bm.nt)
-
-## digestible energy ##
-p.de.n <- ggplot(veg, aes(x = NDVI, y = DE)) +
-  geom_smooth(method = "glm", color = "black")
-p.de.e <- ggplot(veg, aes(x = EVI, y = DE)) +
-  geom_smooth(method = "glm", color = "black")
-p.de.na <- ggplot(veg, aes(x = ndvi_amp, y = DE)) +
-  geom_smooth(method = "glm", color = "black")
-p.de.nt <- ggplot(veg, aes(x = ndvi_ti, y = DE)) +
-  geom_smooth(method = "glm", color = "black")
-grid.arrange(p.de.n, p.de.e, p.de.na, p.de.nt)
-
-## fecal nitrogen ##
-p.fn.n <- ggplot(fn, aes(x = NDVI, y = PctFN)) +
-  geom_smooth(method = "glm", color = "black")
-p.fn.e <- ggplot(fn, aes(x = EVI, y = PctFN)) +
-  geom_smooth(method = "glm", color = "black")
-grid.arrange(p.fn.n, p.fn.e)
-
-
-## comparing relationships w remotely sensed veg indices ##
-### bic ###
-
-# forage biomass #
-mods <- list()
-mods[[1]] <- glm(ForageBiomass ~ NDVI, data = veg)
-mods[[2]] <- glm(ForageBiomass ~ NDVI + I(NDVI^2), data = veg)
-mods[[3]] <- glm(ForageBiomass ~ NDVI + I(NDVI^2) + I(NDVI^3), data = veg)
-mods[[4]] <- glm(ForageBiomass ~ EVI, data = veg)
-mods[[5]] <- glm(ForageBiomass ~ EVI + I(EVI^2), data = veg)
-mods[[6]] <- glm(ForageBiomass ~ ndvi_amp + I(ndvi_amp^2), data = veg)
-mods[[7]] <- glm(ForageBiomass ~ ndvi_ti + I(ndvi_ti^2), data = veg)
-bictab1 <- data.frame(mod = c("Biomass-NDVI", "Biomass-NDVI2", "Biomass-NDVI3", 
-            "Biomass-EVI","Biomass-EVI2", 
-            "Biomass-NDVIamp2", "Biomass-NDVIti2"),
-            res = c(BIC(mods[[1]]), BIC(mods[[2]]), BIC(mods[[3]]), 
-                    BIC(mods[[4]]), BIC(mods[[5]]), BIC(mods[[6]]),
-                    BIC(mods[[7]])))
-arrange(bictab1, res)
-
-
-# digestible energy #
-mods <- list()
-mods[[1]] <- glm(DE ~ NDVI, data = veg)
-mods[[2]] <- glm(DE ~ NDVI + I(NDVI^2), data = veg)
-mods[[3]] <- glm(DE ~ EVI, data = veg) #unexpected
-mods[[4]] <- glm(DE ~ EVI +I(EVI^2), data = veg)
-mods[[5]] <- glm(DE ~ ndvi_amp, data = veg)
-mods[[6]] <- glm(DE ~ ndvi_amp + I(ndvi_amp^2) + I(ndvi_amp^3), data = veg)
-mods[[7]] <- glm(DE ~ ndvi_ti, data = veg)
-mods[[8]] <- glm(DE ~ ndvi_ti + I(ndvi_ti^2), data = veg)
-mods[[9]] <- glm(DE ~ ndvi_ti + I(ndvi_ti^2) + I(ndvi_ti^3), data = veg)
-bictab2 <- data.frame(mod = c("DE-NDVI", "DE-NDVI2", "DE-EVIno",
-                     "DE-EVI2", "DE-NDVIamp", "DE-NDVI-amp3",
-                     "DE-NDVIti", "DE-NDVIti2", "DE-NDVIti3"),
-            res = c(BIC(mods[[1]]), BIC(mods[[2]]), BIC(mods[[3]]), 
-                    BIC(mods[[4]]), BIC(mods[[5]]), BIC(mods[[6]]),
-                    BIC(mods[[7]]), BIC(mods[[8]]), BIC(mods[[9]])))
-arrange(bictab2, res)
-
-
-# fecal nitrogen #
-mods <- list()
-mods[[1]] <- glm(PctFN ~ NDVI, data = fn)
-mods[[2]] <- glm(PctFN ~ NDVI + I(NDVI^2) + I(NDVI^3), data = fn)
-mods[[3]] <- glm(PctFN ~ EVI, data = fn)
-mods[[4]] <- glm(PctFN ~ EVI + I(EVI^2) + I(EVI^3), data = fn)
-bictab3 <- data.frame(mod = c("FN-NDVI", "FN-NDVI3",
-                     "FN-EVI", "FN-EVI3"),
-            res = c(BIC(mods[[1]]), BIC(mods[[2]]), BIC(mods[[3]]), 
-                    BIC(mods[[4]])))
-arrange(bictab3, res)
-
-## store and export results ##
-bictab.all <- rbind(bictab1, bictab2, bictab3)
-write.csv(bictab.all, file = "bic-results.csv", row.names = F)
-
-
-## random effect of landcover type ##
-library(lme4)
-test <- glmer(ForageBiomass ~ NDVI + (1|ClassName), data = veg)
-summary(test)
-
-
-## kinda-supported models ##
-mid.bm <- lm(ForageBiomass ~ NDVI + I(NDVI^2) + I(NDVI^3), data = veg)
-summary(mid.bm)
-plot(mid.bm)
