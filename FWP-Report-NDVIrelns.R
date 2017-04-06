@@ -233,8 +233,6 @@ write.csv(aictab.all, file = "aic-results.csv", row.names = F)
 
 
 #### top models ####
-## kristin you pasted this in to cut stuff already
-## so update as you go
 
 par(mfrow=c(2,2))
 
@@ -440,4 +438,137 @@ p.fn.tc <- ggplot(fn, aes(x=EVI, y=PctFN, fill=Treecov)) +
 
 
 
+#### prediction plots, incl polynomials ####
 
+
+## forage biomass ## 
+    #supported models#
+    #m1 <- lm(ForageBiomass ~ NDVI, data = veg2)
+    #m2 <- lm(ForageBiomass ~ EVI*Treecov, data = veg2)
+    #m3 <- lm(ForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov, data = veg2)
+p.bm.m1 <- ggplot(veg2, aes(x=NDVI, y=ForageBiomass)) +
+  stat_smooth(method="lm", 
+              se = TRUE,
+              colour = "black",
+              lty = "1F")  +
+  theme(legend.position="none") +
+  labs(y = expression(paste(
+                        "Forage Biomass (g/", 
+                         m^2, ")", sep="")))
+p.bm.m2 <- ggplot(veg2, aes(x=EVI, y=ForageBiomass, linetype=Treecov)) + 
+  stat_smooth(method="lm", 
+              se = TRUE, 
+              colour = "black")+
+  theme(legend.position="none")+
+  labs(y = "")
+p.bm.m3 <- ggplot(veg2, aes(x=EVI, y=ForageBiomass, linetype=Treecov)) + 
+  stat_smooth(method="lm", 
+              se = TRUE, 
+              formula = y ~ poly(x, 2, raw = TRUE), 
+              colour = "black")+
+  theme(legend.position="none")+
+  labs(y="")
+
+
+## herbaceous forage biomass ##
+    #supported models#
+    #m5 <- lm(HerbaceousForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov + I(EVI^3)*Treecov, data = veg2)
+    #m6 <- lm(HerbaceousForageBiomass ~ EVI*Treecov + I(EVI^2)*Treecov, data = veg2)
+p.fb <- ggplot(veg2, aes(x = EVI, y = HerbaceousForageBiomass,
+                         linetype = Treecov))
+p.fb.m1 <- p.fb +
+  stat_smooth(method="lm", 
+              se = TRUE, 
+              formula = y ~ poly(x, 3, raw = TRUE), 
+              colour = "black")  +
+  theme(legend.position="none") +
+  labs(y = expression(paste(
+                        "Herbaceous \nForage Biomass (g/", 
+                         m^2, ")", sep="")))
+p.fb.m2 <- p.fb +
+  stat_smooth(method="lm", 
+              se = TRUE, 
+              formula = y ~ poly(x, 2, raw = TRUE), 
+              colour = "black") +
+  theme(legend.position="none") +
+  labs(y="")
+
+
+## digestible energy ##
+    #supported models#
+    #m7 <- lm(DE ~ ndvi_ti*Treecov + I(ndvi_ti^2)*Treecov + I(ndvi_ti^3)*Treecov, data = veg2)
+    #m8 <- lm(DE ~ ndvi_amp*Treecov + I(ndvi_amp^2)*Treecov, data = veg2)
+p.de.m1 <- ggplot(veg2, aes(x = ndvi_ti, y = DE, linetype = Treecov)) +
+  stat_smooth(method = lm,
+              se = TRUE,
+              formula = y ~ poly(x, 3, raw = TRUE),
+              colour = "black")+
+  theme(legend.position="none") +
+  labs(x = "Time-integrated NDVI",
+       y = "Digestible Energy (kcal/g)")
+p.de.m2 <- ggplot(veg2, aes(x = ndvi_amp, y = DE, linetype = Treecov)) +
+  stat_smooth(method = lm,
+              se = TRUE,
+              formula = y ~ poly(x, 2, raw = TRUE),
+              colour = "black")+
+  theme(legend.position="none")+
+  labs(x = "NDVI amplitude",
+       y="")
+
+## fecal nitrogen ##
+    #supported models#
+    #m9 <- lm(PctFN ~ EVI*Treecov, data = fn)
+    #m10 <- lm(PctFN ~ NDVI, data = fn)
+    #m11 <- lm(PctFN ~ EVI, data = fn)
+p.fn.m1 <- ggplot(fn, aes(x=EVI, y=PctFN, linetype=Treecov)) +
+  stat_smooth(method="lm", 
+              se = TRUE, 
+              colour = "black")+
+  theme(legend.position="none") +
+  labs(y = "Fecal Nitrogen (%)")
+p.fn.m2 <- ggplot(fn, aes(x=NDVI, y=PctFN)) +
+  stat_smooth(method="lm", 
+              se = TRUE, 
+              colour = "black",
+              lty = "1F")+
+  theme(legend.position="none")+
+  labs(y="")
+p.fn.m3 <- ggplot(fn, aes(x=EVI, y=PctFN)) +
+  stat_smooth(method="lm", 
+              se = TRUE, 
+              colour = "black",
+              lty = "1F")+
+  theme(legend.position="none")+
+  labs(y="")
+
+
+## plot together ##
+
+#extract legend (from sthda.com)
+get_legend<-function(myggplot){
+  tmp <- ggplot_gtable(ggplot_build(myggplot))
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+  legend <- tmp$grobs[[leg]]
+  return(legend)
+}
+#getting hacky to savetime
+fnno <- fn %>%
+  mutate(tc = ifelse(Treecov == 0, "Open Canopy", "Forest Canopy")) 
+fnno$tc <- factor(fnno$tc,
+                     levels = c("Open Canopy", "Forest Canopy"))
+p.fn.m <- ggplot(fnno, aes(x=EVI, y=PctFN, linetype=tc)) +
+  stat_smooth(method="lm", 
+              se = TRUE, 
+              colour = "black")+
+  theme(legend.title=element_blank())
+legend <- get_legend(p.fn.m)
+
+
+grid.arrange(p.bm.m1, p.bm.m2, p.bm.m3,
+             p.fb.m1, p.fb.m2, legend,
+             p.de.m1, p.de.m2, 
+             p.fn.m1, p.fn.m2, p.fn.m3,
+             layout_matrix = rbind(c(1,2,3),
+                                   c(4,5,6),
+                                   c(7,8, NA),
+                                   c(9,10,11)))

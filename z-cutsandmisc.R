@@ -2,6 +2,23 @@
 ### from remote sensing section of fwp report ###
 ## some day i'll do something right on the first try ###
 
+## plotting polynomial response
+  ## if start just poly then try interaction
+test <- lm(ForageBiomass ~ EVI + I(EVI^2) + I(EVI^3), data = veg2)
+test2 <- veg2$ForageBiomass ~ veg2$EVI + I(veg2$EVI^2) + I(veg2$EVI^3)
+curve(test2, from = min(veg2$ForageBiomass), to = max(veg2$ForageBiomass),
+      n = 100)
+# newp #
+
+p <- ggplot(veg2, aes(x=EVI, y=ForageBiomass, linetype=Treecov))
+p2 <- p + 
+  stat_smooth(method="lm", 
+              se = TRUE, 
+              #fill = NA,
+              formula = y ~ poly(x, 3, raw = TRUE), 
+              colour = "black")
+#omfggg              
+              
 
 ## hierarchical selection, bad plan
 
