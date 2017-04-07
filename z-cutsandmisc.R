@@ -20,6 +20,12 @@ p2 <- p +
 #omfggg              
               
 
+## ndvi, evi thru yr
+test <- ndvi
+test$SDate <- as.Date(as.character(test$RemoteDate), format='%Y-%m-%d')
+test$DOY <- strftime(test$SDate, format = "%j")
+plot(NDVI ~ DOY, data = test)
+
 ## hierarchical selection, bad plan
 
 

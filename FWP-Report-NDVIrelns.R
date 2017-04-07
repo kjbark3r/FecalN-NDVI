@@ -87,6 +87,7 @@ veg$Treecov <- as.factor(veg$Treecov)
 veg2 <- filter(veg, ForageBiomass < 1000,
                NDVI > 2500)
 
+
 ########## ANALYSES ##############
 
 
