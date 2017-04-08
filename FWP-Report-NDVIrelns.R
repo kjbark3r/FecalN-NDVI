@@ -33,8 +33,8 @@ bm <- read.csv("../Vegetation/biomass-plot-summeronly.csv")
 fq <- read.csv("../Vegetation/de-plot-summeronly.csv")
 fn <- read.csv("ndvi-fn-data.csv")
 ndvi.ti.amp <- read.csv("../Vegetation/DE-model-data.csv") %>%
-  select(PlotVisit, landcov, ndvi_amp, ndvi_ti) %>%
-  rename(Landcov = landcov)
+  dplyr::select(PlotVisit, landcov, ndvi_amp, ndvi_ti) %>%
+  dplyr::rename(Landcov = landcov)
 
 # fix classes of fecal n data
 fn$Date <- as.Date(fn$Date)
@@ -42,9 +42,9 @@ fn$Treecov <- as.factor(fn$Treecov)
 
 # combine data
 vegtmp <- fq %>%
-  select(PlotVisit, DE) %>%
+  dplyr::select(PlotVisit, DE) %>%
   full_join(bm, by = "PlotVisit") %>%
-  select(-c(Latitude, Longitude)) %>%
+  dplyr::select(-c(Latitude, Longitude)) %>%
   left_join(ndvi, by = "PlotVisit") %>%
   left_join(ndvi.ti.amp, by = "PlotVisit") %>%
   dplyr::filter(ForageBiomass < 10000) %>%
@@ -573,3 +573,122 @@ grid.arrange(p.bm.m1, p.bm.m2, p.bm.m3,
                                    c(4,5,6),
                                    c(7,8, NA),
                                    c(9,10,11)))
+
+
+#### violin plot avg FQ R/I/M ####
+
+# data #
+mignute.avg <- read.csv("../Nutrition/mig-avgforage.csv") %>%
+  within(Date <- as.POSIXlt(Date, format = "%Y-%m-%d")) %>%
+  transform(MigStatus = factor(MigStatus,
+                        levels = c("Resident",
+                                   "Intermediate",
+                                   "Migrant"),
+                            ordered = TRUE)) 
+mignute.avg$DOY <- mignute.avg$Date$yday #day of year
+
+# plot #
+viol.fq <- ggplot(data = mignute.avg, 
+        aes(x = MigStatus, y = AvgDE)) +
+        geom_violin(fill="grey") +
+        geom_boxplot(width=.1, outlier.colour=NA) +
+        geom_hline(yintercept=2.75) +
+        stat_summary(fun.y=mean, geom="point", 
+                     fill="black", shape=21, size=2.5) +
+        labs(x = "", 
+             y = "Average Forage Quality (kcal/g)") +
+        theme(legend.position="none",
+              text = element_text(size=15),
+              axis.text.x = element_text(size = 15),
+              plot.title = element_text(hjust = 0.5)) 
+viol.fq        
+  
+
+#### timeplot avg fq ####
+
+# data #
+avgday <- mignute.avg %>%
+  dplyr::select(-Date) %>%
+  group_by(DOY, MigStatus) %>%
+  summarise(AvgDayDE = mean(AvgDE, na.rm=T),
+            AvgDayGHerb = mean(AvgGHerb, na.rm=T),
+            AvgDayGShrub = mean(AvgGShrub, na.rm=T),
+            AvgDayGForage = mean(AvgGForage, na.rm=T)) %>%
+  ungroup() %>%
+  mutate(DEclass = ifelse(AvgDayDE >= 2.9, "Excellent", 
+                   ifelse(AvgDayDE >= 2.75 & AvgDayDE < 2.9, "Good",
+                   ifelse(AvgDayDE > 2.40 & AvgDayDE < 2.75, "Marginal",
+                          "Poor")))) 
+avgday.date <- avgday %>%
+  mutate(Date = as.Date(DOY, origin = "2014-01-01"))
+
+# plot #
+tp <-  ggplot(avgday.date, 
+              aes(Date, AvgDayDE, 
+                  shape = MigStatus,
+                  linetype = MigStatus)) +
+              geom_point() +
+    geom_smooth(color = "black",
+                show.legend=FALSE)+
+              geom_hline(yintercept=2.75) +
+              labs(x = "", 
+                   y = "Forage Quality (kcal/g)") +
+              theme(legend.title=element_blank(),
+                    text = element_text(size=15)) +
+    guides(shape=guide_legend(override.aes=list(size=4)))
+tp
+
+
+#### fq continuum plot ####
+
+# data #
+migstatus <- read.csv("../Nutrition/migstatus.csv")
+avgday.indiv <- mignute.avg %>%
+  dplyr::select(-Date) %>%
+  dplyr::group_by(IndivYr) %>%
+  dplyr::summarise(AvgDayDE = mean(AvgDE, na.rm=T),
+            AvgDayGHerb = mean(AvgGHerb, na.rm=T),
+            AvgDayGShrub = mean(AvgGShrub, na.rm=T),
+            AvgDayGForage = mean(AvgGForage, na.rm=T)) %>%
+  dplyr::ungroup() %>%
+  mutate(DEclass = ifelse(AvgDayDE >= 2.9, "Excellent", 
+                   ifelse(AvgDayDE >= 2.75 & AvgDayDE < 2.9, "Good",
+                   ifelse(AvgDayDE > 2.40 & AvgDayDE < 2.75, "Marginal",
+                          "Poor")))) %>%
+  left_join(migstatus, by = "IndivYr")%>%
+  transform(MigStatus = factor(MigStatus,
+                        levels = c("Resident",
+                                   "Intermediate",
+                                   "Migrant"),
+                            ordered = TRUE)) 
+
+# plot #
+fqmig <- ggplot(avgday.indiv,
+                aes(x = MigRank, y = AvgDayDE)) +
+  labs(x = "Resident                                                     Migrant", 
+       y = "Forage Quality (kcal/g)") +
+  geom_smooth(color = "black")+
+  geom_hline(yintercept=2.75) +
+  theme(text = element_text(size=25),
+        axis.text.x=element_blank()) 
+fqmig
+
+
+#### nutrition data distributions (just looking) ####
+
+# density plots #
+p.bm <- ggplot(data = veg2, 
+               aes(x = ForageBiomass)) +
+  geom_density()
+p.bmh <- ggplot(data = veg2, 
+               aes(x = HerbaceousForageBiomass)) +
+  geom_density()          
+p.de <- ggplot(data = veg2, 
+               aes(x = DE)) +
+  geom_density()     
+p.fn <- ggplot(data = fn, 
+               aes(x = PctFN)) +
+  geom_density()  
+grid.arrange(p.bm, p.bmh, p.de, p.fn,
+             nrow = 2)
+ 
