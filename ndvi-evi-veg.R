@@ -382,7 +382,7 @@ p.bmh.nt <- ggplot(veg2, aes(x = ndvi_ti, y = HerbaceousForageBiomass)) +
 
 
 
-## digestible energy ##
+## digestible energy - loess smoother ##
 p.de.n <- ggplot(veg2, aes(x = NDVI, y = DE)) +
   geom_smooth(method = "loess", color = "black") +
   geom_point(size = 0.5) +
@@ -413,13 +413,15 @@ p.fn.e <- ggplot(fn, aes(x = EVI, y = PctFN)) +
   labs(x = "EVI", y = "")
 #grid.arrange(p.fn.n, p.fn.e)
 
-## all together, hopefully ##
+## all together ##
 grid.arrange(p.bm.n, p.bm.e, p.bm.na, p.bm.nt,
              p.bmh.n, p.bmh.e, p.bmh.na, p.bmh.nt,
              p.de.n, p.de.e, p.de.na, p.de.nt,
              p.fn.n, p.fn.e)
 
-#### how tree cover affects responses ####
+
+
+#### plots - how tree cover affects responses ####
 
 p.bm.tc <- ggplot(veg2, aes(x=EVI, y=ForageBiomass, fill=Treecov)) +
     stat_smooth(method="glm", 
@@ -552,7 +554,8 @@ get_legend<-function(myggplot){
   legend <- tmp$grobs[[leg]]
   return(legend)
 }
-#getting hacky to savetime
+#new df with text labels for tree cover (open/forest)
+#just because i have no time to deal with fixing legends the right way...
 fnno <- fn %>%
   mutate(tc = ifelse(Treecov == 0, "Open Canopy", "Forest Canopy")) 
 fnno$tc <- factor(fnno$tc,
@@ -573,71 +576,6 @@ grid.arrange(p.bm.m1, p.bm.m2, p.bm.m3,
                                    c(4,5,6),
                                    c(7,8, NA),
                                    c(9,10,11)))
-
-
-#### violin plot avg FQ R/I/M ####
-
-# data #
-mignute.avg <- read.csv("../Nutrition/mig-avgforage.csv") %>%
-  within(Date <- as.POSIXlt(Date, format = "%Y-%m-%d")) %>%
-  transform(MigStatus = factor(MigStatus,
-                        levels = c("Resident",
-                                   "Intermediate",
-                                   "Migrant"),
-                            ordered = TRUE)) 
-mignute.avg$DOY <- mignute.avg$Date$yday #day of year
-
-# plot #
-viol.fq <- ggplot(data = mignute.avg, 
-        aes(x = MigStatus, y = AvgDE)) +
-        geom_violin(fill="grey") +
-        geom_boxplot(width=.1, outlier.colour=NA) +
-        geom_hline(yintercept=2.75) +
-        stat_summary(fun.y=mean, geom="point", 
-                     fill="black", shape=21, size=2.5) +
-        labs(x = "", 
-             y = "Average Forage Quality (kcal/g)") +
-        theme(legend.position="none",
-              text = element_text(size=15),
-              axis.text.x = element_text(size = 15),
-              plot.title = element_text(hjust = 0.5)) 
-viol.fq        
-  
-
-#### timeplot avg fq ####
-
-# data #
-avgday <- mignute.avg %>%
-  dplyr::select(-Date) %>%
-  group_by(DOY, MigStatus) %>%
-  summarise(AvgDayDE = mean(AvgDE, na.rm=T),
-            AvgDayGHerb = mean(AvgGHerb, na.rm=T),
-            AvgDayGShrub = mean(AvgGShrub, na.rm=T),
-            AvgDayGForage = mean(AvgGForage, na.rm=T)) %>%
-  ungroup() %>%
-  mutate(DEclass = ifelse(AvgDayDE >= 2.9, "Excellent", 
-                   ifelse(AvgDayDE >= 2.75 & AvgDayDE < 2.9, "Good",
-                   ifelse(AvgDayDE > 2.40 & AvgDayDE < 2.75, "Marginal",
-                          "Poor")))) 
-avgday.date <- avgday %>%
-  mutate(Date = as.Date(DOY, origin = "2014-01-01"))
-
-# plot #
-tp <-  ggplot(avgday.date, 
-              aes(Date, AvgDayDE, 
-                  shape = MigStatus,
-                  linetype = MigStatus)) +
-              geom_point() +
-    geom_smooth(color = "black",
-                show.legend=FALSE)+
-              geom_hline(yintercept=2.75) +
-              labs(x = "", 
-                   y = "Forage Quality (kcal/g)") +
-              theme(legend.title=element_blank(),
-                    text = element_text(size=15)) +
-    guides(shape=guide_legend(override.aes=list(size=4)))
-tp
-
 
 
 #### nutrition data distributions (just looking) ####
